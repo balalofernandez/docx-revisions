@@ -1,0 +1,28 @@
+site_name: docx-revisions
+site_url: https://balalofernandez.github.io/docx-revisions
+repo_url: https://github.com/balalofernandez/docx-revisions
+
+theme:
+  name: material
+  palette:
+    scheme: default
+    primary: white
+    accent: teal
+  font:
+    text: JetBrains Mono
+    code: JetBrains Mono
+
+plugins:
+  - search
+  - tags
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+            show_root_heading: true
+            members_order: source
+
+nav:
+  - Home: index.md
+  - API Reference: api.md

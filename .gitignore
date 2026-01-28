@@ -15,6 +15,6 @@ htmlcov/
 venv/
 .ruff_cache/
 .mypy_cache/
-docs/
+site/
 *.egg
 .DS_Store

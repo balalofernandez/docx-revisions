@@ -30,7 +30,7 @@ jobs:
         run: uv sync --all-extras
 
       - name: Build docs
-        run: uv run pdoc -o ./docs docx_revisions
+        run: uv run mkdocs build
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -38,7 +38,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./docs
+          path: ./site
 
   deploy:
     needs: build
