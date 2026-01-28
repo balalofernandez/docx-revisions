@@ -28,3 +28,6 @@ for rev in get_revisions(p):
 insert_with_tracking(p, " new text", author="Agent")
 doc.save("output.docx")
 ```
+
+
+::: docx_revisions
