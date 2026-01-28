@@ -1,6 +1,6 @@
 # docx-revisions
 
-Track changes support for python-docx.
+**Track changes and document revision support for Word documents (.docx) in Python.** docx-revisions extends python-docx to read and write **OOXML** revision markup (insertions and deletions) so you can work with **Microsoft Word** track changes, revision metadata (author, date), and accepted text programmatically.
 
 ## Installation
 
@@ -29,5 +29,8 @@ insert_with_tracking(p, " new text", author="Agent")
 doc.save("output.docx")
 ```
 
+Use docx-revisions to **parse DOCX files** with track changes on, get **accepted text** (all insertions applied, deletions removed), list **revisions** (insertions and deletions) with author and date, or **write new revisions** (insert, delete, replace) that appear as track changes in Word. Built on python-docx and **OOXML** (Office Open XML); works with **.docx** and **revision tracking** metadata.
+
+## API reference
 
 ::: docx_revisions

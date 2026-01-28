@@ -62,9 +62,11 @@ def get_accepted_text(paragraph: Paragraph) -> str:
         The accepted text with insertions applied and deletions removed.
 
     Example:
-        >>> from docx import Document
-        >>> doc = Document("tracked.docx")
-        >>> text = get_accepted_text(doc.paragraphs[0])
+        ```python
+        from docx import Document
+        doc = Document("tracked.docx")
+        text = get_accepted_text(doc.paragraphs[0])
+        ```
     """
     result = []
     for tag_type, element in _iter_paragraph_content(paragraph):
@@ -83,11 +85,13 @@ def get_revisions(paragraph: Paragraph) -> list[Revision]:
         List of Revision objects with type, text, author, and date.
 
     Example:
-        >>> from docx import Document
-        >>> doc = Document("tracked.docx")
-        >>> revisions = get_revisions(doc.paragraphs[0])
-        >>> for rev in revisions:
-        ...     print(f"{rev.type}: '{rev.text}' by {rev.author}")
+        ```python
+        from docx import Document
+        doc = Document("tracked.docx")
+        revisions = get_revisions(doc.paragraphs[0])
+        for rev in revisions:
+            print(f"{rev.type}: '{rev.text}' by {rev.author}")
+        ```
     """
     revisions = []
     for tag_type, element in _iter_paragraph_content(paragraph):
@@ -153,10 +157,12 @@ def insert_with_tracking(
         date: Timestamp for the revision. Defaults to current time.
 
     Example:
-        >>> from docx import Document
-        >>> doc = Document()
-        >>> p = doc.add_paragraph("Hello world")
-        >>> insert_with_tracking(p, " beautiful", position=5, author="Editor")
+        ```python
+        from docx import Document
+        doc = Document()
+        p = doc.add_paragraph("Hello world")
+        insert_with_tracking(p, " beautiful", position=5, author="Editor")
+        ```
     """
     if date is None:
         date = datetime.now()
@@ -264,10 +270,12 @@ def delete_with_tracking(
         date: Timestamp for the revision. Defaults to current time.
 
     Example:
-        >>> from docx import Document
-        >>> doc = Document()
-        >>> p = doc.add_paragraph("Hello beautiful world")
-        >>> delete_with_tracking(p, 6, 16, author="Editor")  # Deletes "beautiful "
+        ```python
+        from docx import Document
+        doc = Document()
+        p = doc.add_paragraph("Hello beautiful world")
+        delete_with_tracking(p, 6, 16, author="Editor")  # Deletes "beautiful "
+        ```
     """
     if date is None:
         date = datetime.now()
@@ -425,11 +433,12 @@ def replace_with_tracking(
         True if replacement was made, False if old_text was not found.
 
     Example:
-        >>> from docx import Document
-        >>> doc = Document()
-        >>> p = doc.add_paragraph("Hello world")
-        >>> replace_with_tracking(p, "world", "universe", author="Editor")
-        True
+        ```python
+        from docx import Document
+        doc = Document()
+        p = doc.add_paragraph("Hello world")
+        replace_with_tracking(p, "world", "universe", author="Editor")  # True
+        ```
     """
     if date is None:
         date = datetime.now()

@@ -8,4 +8,6 @@
   <!-- <a href="https://pepy.tech/projects/docx-revisions"><img src="https://static.pepy.tech/badge/docx-revisions" alt="PyPI Downloads"></a> -->
 </p>
 
-A Python library extending python-docx with track changes support for reading and writing Word document revisions (`<w:ins>` and `<w:del>` elements). Provides clean APIs like `get_accepted_text()`, `get_revisions()`, `insert_with_tracking()`, `delete_with_tracking()`, and `replace_with_tracking()` for programmatic revision management.
+**Read and write track changes in Word documents (.docx) with Python.** docx-revisions extends [python-docx](https://python-docx.readthedocs.io/) to support **document revision tracking**, **change tracking**, and **OOXML** revision markup (insertions `<w:ins>` and deletions `<w:del>`) so you can programmatically accept text, list revisions with author and date, and apply insertions, deletions, or replacements with full revision metadata.
+
+Use it for **Microsoft Word**-compatible revision tracking: parse DOCX files with track changes on, get accepted (clean) text, enumerate revisions per paragraph, or write new revisions (insert/delete/replace) that show up as track changes in Word.

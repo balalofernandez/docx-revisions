@@ -1,0 +1,14 @@
+/* Hide line number gutter in code blocks (removes ugly vertical lines) */
+.md-typeset .highlight .linenodiv,
+.md-typeset .highlight table td.linenos,
+.md-typeset .highlight table td:first-child,
+.highlight .linenodiv,
+.highlight table td.linenos,
+.highlight table td:first-child {
+  display: none !important;
+}
+
+.md-typeset .highlight table td.code,
+.highlight table td.code {
+  width: 100%;
+}

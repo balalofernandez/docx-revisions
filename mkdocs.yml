@@ -1,9 +1,22 @@
 site_name: docx-revisions
+site_description: Track changes and document revision support for Word documents (.docx) with Python and python-docx. Read/write OOXML insertions and deletions, revision metadata, and accepted text.
 site_url: https://balalofernandez.github.io/docx-revisions
 repo_url: https://github.com/balalofernandez/docx-revisions
 
+markdown_extensions:
+  - pymdownx.highlight:
+      pygments_lang_class: true
+      linenums: false
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+
+extra_css:
+  - stylesheets/extra.css
+
 theme:
   name: material
+  features:
+    - content.code.copy
   palette:
     scheme: default
     primary: white
