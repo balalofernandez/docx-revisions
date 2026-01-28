@@ -9,7 +9,7 @@ from docx_revisions.revisions import (
     replace_with_tracking,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 __all__ = [
     "Revision",
     "get_accepted_text",
