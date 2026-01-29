@@ -28,6 +28,7 @@ theme:
 plugins:
   - search
   - tags
+  - mkdocs-minify-pluginyes please
   - mkdocstrings:
       handlers:
         python:
