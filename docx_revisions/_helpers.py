@@ -17,11 +17,7 @@ from lxml import etree
 
 def revision_attrs(rev_id: int, author: str, now: str) -> dict[str, str]:
     """Build the standard ``{w:id, w:author, w:date}`` attribute dict."""
-    return {
-        qn("w:id"): str(rev_id),
-        qn("w:author"): author,
-        qn("w:date"): now,
-    }
+    return {qn("w:id"): str(rev_id), qn("w:author"): author, qn("w:date"): now}
 
 
 def make_text_run(text: str) -> OxmlElement:

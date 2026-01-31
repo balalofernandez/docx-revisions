@@ -34,10 +34,7 @@ def read_paragraphs(ctx: RunContext[RevisionDocument]) -> str:
 
 @agent.tool
 def write_with_track_changes(
-    ctx: RunContext[RevisionDocument],
-    paragraph_index: int,
-    search_text: str,
-    new_text: str,
+    ctx: RunContext[RevisionDocument], paragraph_index: int, search_text: str, new_text: str
 ) -> str:
     """Add a tracked edit to a paragraph.
 

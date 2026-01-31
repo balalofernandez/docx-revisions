@@ -1,7 +1,5 @@
 """Unit tests for the OXML element classes in docx_revisions.oxml."""
 
-
-
 import datetime as dt
 
 import pytest
@@ -104,26 +102,17 @@ class DescribeCT_RunTrackChange:
         assert isinstance(d, CT_RunTrackChange)
 
     def it_provides_paragraph_child_access(self):
-        xml = _ins_xml(
-            'w:id="1" w:author="A"',
-            "<w:p/><w:p/>",
-        )
+        xml = _ins_xml('w:id="1" w:author="A"', "<w:p/><w:p/>")
         ins = parse_xml(xml)
         assert len(ins.p_lst) == 2
 
     def it_provides_run_child_access(self):
-        xml = _ins_xml(
-            'w:id="1" w:author="A"',
-            "<w:r/><w:r/><w:r/>",
-        )
+        xml = _ins_xml('w:id="1" w:author="A"', "<w:r/><w:r/><w:r/>")
         ins = parse_xml(xml)
         assert len(ins.r_lst) == 3
 
     def it_provides_inner_content_elements(self):
-        xml = _ins_xml(
-            'w:id="1" w:author="A"',
-            "<w:p/><w:tbl/><w:p/>",
-        )
+        xml = _ins_xml('w:id="1" w:author="A"', "<w:p/><w:tbl/><w:p/>")
         ins = parse_xml(xml)
         elements = ins.inner_content_elements
         assert len(elements) == 3
@@ -132,10 +121,7 @@ class DescribeCT_RunTrackChange:
         assert elements[2].tag == qn("w:p")
 
     def it_provides_run_content_elements(self):
-        xml = _ins_xml(
-            'w:id="1" w:author="A"',
-            "<w:r/><w:r/>",
-        )
+        xml = _ins_xml('w:id="1" w:author="A"', "<w:r/><w:r/>")
         ins = parse_xml(xml)
         elements = ins.run_content_elements
         assert len(elements) == 2

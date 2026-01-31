@@ -13,7 +13,7 @@ def main() -> None:
     for para in rdoc.paragraphs:
         for ins in para.insertions:
             if "docx-revisions" in ins.text:
-                print(f"PASS: Found 'docx-revisions' in tracked insertion.")
+                print("PASS: Found 'docx-revisions' in tracked insertion.")
                 print(f"  Author : {ins.author}")
                 print(f"  Text   : {ins.text!r}")
                 found = True

@@ -1,7 +1,5 @@
 """Integration tests — round-trip and real docx file tests."""
 
-
-
 from pathlib import Path
 
 from docx import Document

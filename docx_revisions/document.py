@@ -85,11 +85,7 @@ class RevisionDocument:
                 change.reject()
 
     def find_and_replace_tracked(
-        self,
-        search_text: str,
-        replace_text: str,
-        author: str = "",
-        comment: str | None = None,
+        self, search_text: str, replace_text: str, author: str = "", comment: str | None = None
     ) -> int:
         """Find and replace across the whole document with track changes.
 
@@ -125,9 +121,7 @@ class RevisionDocument:
                 for cell in row.cells:
                     for p in cell.paragraphs:
                         rp = RevisionParagraph.from_paragraph(p)
-                        total_count += rp.replace_tracked(
-                            search_text, replace_text, author=author, comment=comment
-                        )
+                        total_count += rp.replace_tracked(search_text, replace_text, author=author, comment=comment)
 
         return total_count
 

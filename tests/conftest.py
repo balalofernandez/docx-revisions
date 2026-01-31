@@ -1,7 +1,5 @@
 """Shared test fixtures for docx-revisions."""
 
-
-
 from pathlib import Path
 
 import pytest

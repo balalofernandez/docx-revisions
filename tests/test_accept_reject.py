@@ -1,6 +1,5 @@
 """Tests for accepting and rejecting tracked changes."""
 
-
 from pathlib import Path
 
 from docx import Document
