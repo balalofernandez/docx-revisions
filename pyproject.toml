@@ -1,6 +1,6 @@
 [project]
 name = "docx-revisions"
-version = "0.1.1"
+version = "0.1.2"
 description = "Track changes (revisions) support for python-docx: read, write and manipulate <w:ins> and <w:del> elements"
 readme = "README.md"
 license = { text = "MIT" }
