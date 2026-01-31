@@ -1,20 +1,23 @@
 """docx-revisions: Track changes support for python-docx."""
 
-from docx_revisions.models import Revision
-from docx_revisions.revisions import (
-    delete_with_tracking,
-    get_accepted_text,
-    get_revisions,
-    insert_with_tracking,
-    replace_with_tracking,
-)
+from importlib.metadata import version
 
-__version__ = "0.1.1"
+from docx_revisions.document import RevisionDocument
+from docx_revisions.oxml import register_revision_elements
+from docx_revisions.paragraph import RevisionParagraph
+from docx_revisions.revision import TrackedChange, TrackedDeletion, TrackedInsertion
+from docx_revisions.run import RevisionRun
+
+# Register OXML element classes so lxml produces typed instances
+# for w:ins, w:del, w:delText, etc.
+register_revision_elements()
+
+__version__ = version("docx-revisions")
 __all__ = [
-    "Revision",
-    "get_accepted_text",
-    "get_revisions",
-    "insert_with_tracking",
-    "delete_with_tracking",
-    "replace_with_tracking",
+    "RevisionDocument",
+    "RevisionParagraph",
+    "RevisionRun",
+    "TrackedChange",
+    "TrackedDeletion",
+    "TrackedInsertion",
 ]

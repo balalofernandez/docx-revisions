@@ -18,3 +18,4 @@ venv/
 site/
 *.egg
 .DS_Store
+python-docx/*

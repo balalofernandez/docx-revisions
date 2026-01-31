@@ -9,7 +9,6 @@
       "bump-patch-for-minor-pre-major": true,
       "extra-files": [
         "pyproject.toml",
-        "docx_revisions/__init__.py",
         {
           "type": "toml",
           "path": "uv.lock",

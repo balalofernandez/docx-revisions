@@ -1,0 +1,2479 @@
+diff --git a/.gitignore b/.gitignore
+index 5aabfd8..e63d1d7 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -8,3 +8,4 @@
+ _scratch/
+ Session.vim
+ /.tox/
++.venv/
+diff --git a/docs/api/revisions.rst b/docs/api/revisions.rst
+new file mode 100644
+index 0000000..7e1ee44
+--- /dev/null
++++ b/docs/api/revisions.rst
+@@ -0,0 +1,30 @@
++.. _revisions_api:
++
++Revision-related objects
++========================
++
++.. currentmodule:: docx.revision
++
++
++|TrackedChange| objects
++-----------------------
++
++.. autoclass:: TrackedChange()
++   :members:
++   :inherited-members:
++
++
++|TrackedInsertion| objects
++--------------------------
++
++.. autoclass:: TrackedInsertion()
++   :members:
++   :inherited-members:
++
++
++|TrackedDeletion| objects
++-------------------------
++
++.. autoclass:: TrackedDeletion()
++   :members:
++   :inherited-members:
+\ No newline at end of file
+diff --git a/docs/conf.py b/docs/conf.py
+index 883ecb8..2846af9 100644
+--- a/docs/conf.py
++++ b/docs/conf.py
+@@ -390,4 +390,4 @@ texinfo_documents = [
+ 
+ 
+ # Example configuration for intersphinx: refer to the Python standard library.
+-intersphinx_mapping = {"http://docs.python.org/3/": None}
++intersphinx_mapping = {"python": ("https://docs.python.org/3/", None)}
+diff --git a/docs/index.rst b/docs/index.rst
+index aee0acf..a0fc7b7 100644
+--- a/docs/index.rst
++++ b/docs/index.rst
+@@ -82,6 +82,7 @@ User Guide
+    user/styles-understanding
+    user/styles-using
+    user/comments
++   user/revisions
+    user/shapes
+ 
+ 
+@@ -98,6 +99,7 @@ API Documentation
+    api/table
+    api/section
+    api/comments
++   api/revisions
+    api/shape
+    api/dml
+    api/shared
+diff --git a/docs/user/revisions.rst b/docs/user/revisions.rst
+new file mode 100644
+index 0000000..29aa307
+--- /dev/null
++++ b/docs/user/revisions.rst
+@@ -0,0 +1,274 @@
++.. _revisions:
++
++Working with Tracked Changes (Revisions)
++========================================
++
++Word allows *track changes* (also known as *revisions*) to be enabled on a document.
++This feature records insertions and deletions made to the document, showing who made
++each change and when. This is commonly used for collaborative editing and review
++workflows.
++
++When track changes is enabled:
++
++- Inserted text is marked with the ``<w:ins>`` element
++- Deleted text is marked with the ``<w:del>`` element
++- Each revision records the author, date, and a unique revision ID
++
++.. note::
++
++    *python-docx* supports creating and reading tracked changes, as well as accepting
++    or rejecting individual revisions programmatically.
++
++
++Enabling Track Changes
++----------------------
++
++Track changes mode is controlled via the document settings::
++
++    >>> from docx import Document
++    >>> document = Document()
++    >>> document.settings.track_revisions = True
++    >>> document.settings.track_revisions
++    True
++
++When ``track_revisions`` is ``True``, Word will track any subsequent changes made in
++the Word application. Changes made programmatically via *python-docx* must be
++explicitly marked as tracked using the methods described below.
++
++
++Find and Replace with Track Changes
++-----------------------------------
++
++The most common use case is performing a find-and-replace operation where the changes
++are tracked. The :meth:`.Document.find_and_replace_tracked` method handles this::
++
++    >>> document = Document("contract.docx")
++    >>> document.settings.track_revisions = True
++    >>> count = document.find_and_replace_tracked(
++    ...     search_text="Acme Corp",
++    ...     replace_text="NewCo Inc",
++    ...     author="Legal Team",
++    ...     comment="Company name updated per merger agreement",
++    ... )
++    >>> print(f"Replaced {count} occurrences")
++    Replaced 15 occurrences
++    >>> document.save("contract_revised.docx")
++
++This method:
++
++- Searches all paragraphs in the document body and tables
++- Replaces only the specific text (word-level), preserving surrounding formatting
++- Creates tracked deletions for the old text and tracked insertions for the new text
++- Optionally attaches a comment to each replacement explaining the change
++
++For more control, you can use :meth:`.Paragraph.replace_tracked` on individual
++paragraphs::
++
++    >>> for paragraph in document.paragraphs:
++    ...     if "confidential" in paragraph.text.lower():
++    ...         paragraph.replace_tracked("draft", "final", author="Editor")
++
++
++Offset-Based Replacement
++------------------------
++
++When you already know the exact character positions (e.g., from regex matching or
++external analysis), you can use offset-based replacement instead of text matching.
++This is more precise and avoids the overhead of text searching.
++
++**Paragraph-level replacement:**
++
++Replace text at specific character offsets relative to ``paragraph.text``::
++
++    >>> paragraph = document.add_paragraph("Hello World, welcome!")
++    >>> # Replace characters 6-11 ("World") with "Universe"
++    >>> paragraph.replace_tracked_at(
++    ...     start=6,
++    ...     end=11,
++    ...     replace_text="Universe",
++    ...     author="Script",
++    ...     comment="Expanded scope",  # optional
++    ... )
++    >>> paragraph.text
++    'Hello Universe, welcome!'
++
++This works even when the text spans multiple runs::
++
++    >>> # If paragraph has: Run1="Hello ", Run2="World"
++    >>> # And you want to replace chars 4-9 ("o Wor")
++    >>> paragraph.replace_tracked_at(start=4, end=9, replace_text="X", author="Script")
++
++**Run-level replacement:**
++
++Replace text at offsets within a single run::
++
++    >>> run = paragraph.runs[0]
++    >>> # Replace characters 0-5 of this run
++    >>> run.replace_tracked_at(start=0, end=5, replace_text="Hi", author="Script")
++
++**Common use case - regex replacement:**
++
++Combine Python's ``re`` module with offset-based replacement::
++
++    >>> import re
++    >>> paragraph = document.add_paragraph("Contact: john@example.com or jane@test.org")
++    >>> # Find all email addresses and replace with [REDACTED]
++    >>> text = paragraph.text
++    >>> for match in reversed(list(re.finditer(r'\S+@\S+', text))):
++    ...     paragraph.replace_tracked_at(
++    ...         start=match.start(),
++    ...         end=match.end(),
++    ...         replace_text="[REDACTED]",
++    ...         author="Privacy Bot",
++    ...     )
++
++.. note::
++
++    Use ``reversed()`` when making multiple replacements to avoid offset shifts.
++    Replacing from end to start ensures earlier offsets remain valid.
++
++
++Adding Tracked Insertions
++-------------------------
++
++To add new text as a tracked insertion::
++
++    >>> paragraph = document.add_paragraph("This is existing text. ")
++    >>> tracked = paragraph.add_run_tracked(
++    ...     text="This was added later.",
++    ...     author="John Smith",
++    ... )
++    >>> tracked
++    <docx.revision.TrackedInsertion object at 0x...>
++    >>> tracked.author
++    'John Smith'
++    >>> tracked.text
++    'This was added later.'
++
++The ``add_run_tracked`` method wraps the new text in a ``<w:ins>`` element, marking
++it as inserted content that will appear in Word's track changes view.
++
++
++Creating Tracked Deletions
++--------------------------
++
++To mark existing text as deleted (without actually removing it)::
++
++    >>> paragraph = document.add_paragraph("Delete this text please.")
++    >>> run = paragraph.runs[0]
++    >>> tracked = run.delete_tracked(author="Editor")
++    >>> tracked
++    <docx.revision.TrackedDeletion object at 0x...>
++    >>> tracked.text
++    'Delete this text please.'
++
++The text remains in the document but is wrapped in a ``<w:del>`` element. In Word,
++this text appears with strikethrough formatting.
++
++
++Iterating Over Revisions
++------------------------
++
++To access tracked changes in a paragraph, use ``iter_inner_content`` with
++``include_revisions=True``::
++
++    >>> from docx.revision import TrackedInsertion, TrackedDeletion
++    >>> for item in paragraph.iter_inner_content(include_revisions=True):
++    ...     if isinstance(item, TrackedInsertion):
++    ...         print(f"INSERTED by {item.author}: {item.text}")
++    ...     elif isinstance(item, TrackedDeletion):
++    ...         print(f"DELETED by {item.author}: {item.text}")
++    ...     else:
++    ...         print(f"Normal text: {item.text}")
++
++
++Accepting and Rejecting Changes
++-------------------------------
++
++Individual revisions can be accepted or rejected programmatically::
++
++    >>> # Accept an insertion (keeps the inserted text)
++    >>> tracked_insertion.accept()
++
++    >>> # Reject an insertion (removes the inserted text)
++    >>> tracked_insertion.reject()
++
++    >>> # Accept a deletion (removes the deleted text)
++    >>> tracked_deletion.accept()
++
++    >>> # Reject a deletion (restores the deleted text)
++    >>> tracked_deletion.reject()
++
++
++TrackedInsertion and TrackedDeletion Properties
++-----------------------------------------------
++
++Both ``TrackedInsertion`` and ``TrackedDeletion`` objects provide these properties:
++
++``author``
++    The name of the author who made the change (read/write).
++
++``date``
++    The date and time of the change as a ``datetime`` object (read-only).
++
++``revision_id``
++    The unique identifier for this revision (read/write).
++
++``text``
++    The text content of the revision (read-only).
++
++``runs``
++    A list of ``Run`` objects contained in the revision.
++
++``is_run_level``
++    ``True`` if the revision contains runs (inline content).
++
++``is_block_level``
++    ``True`` if the revision contains paragraphs or tables (block content).
++
++
++Example: Processing a Document with Track Changes
++-------------------------------------------------
++
++Here's a complete example that processes an existing document with track changes::
++
++    >>> from docx import Document
++    >>> from docx.revision import TrackedInsertion, TrackedDeletion
++
++    >>> document = Document("reviewed_document.docx")
++
++    >>> # Count revisions
++    >>> insertions = 0
++    >>> deletions = 0
++
++    >>> for paragraph in document.paragraphs:
++    ...     for item in paragraph.iter_inner_content(include_revisions=True):
++    ...         if isinstance(item, TrackedInsertion):
++    ...             insertions += 1
++    ...             print(f"[+] {item.author}: {item.text[:50]}...")
++    ...         elif isinstance(item, TrackedDeletion):
++    ...             deletions += 1
++    ...             print(f"[-] {item.author}: {item.text[:50]}...")
++
++    >>> print(f"\nTotal: {insertions} insertions, {deletions} deletions")
++
++
++Example: Bulk Accept All Changes
++--------------------------------
++
++To accept all tracked changes in a document::
++
++    >>> from docx import Document
++    >>> from docx.revision import TrackedInsertion, TrackedDeletion
++
++    >>> document = Document("reviewed_document.docx")
++
++    >>> for paragraph in document.paragraphs:
++    ...     for item in list(paragraph.iter_inner_content(include_revisions=True)):
++    ...         if isinstance(item, (TrackedInsertion, TrackedDeletion)):
++    ...             item.accept()
++
++    >>> document.save("accepted_document.docx")
++
++Note the use of ``list()`` to materialize the iterator before modifying the document,
++as accepting/rejecting changes modifies the underlying XML.
+\ No newline at end of file
+diff --git a/pyproject.toml b/pyproject.toml
+index b3dc0be..344443c 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -75,6 +75,9 @@ filterwarnings = [
+     # -- pytest-xdist plugin may warn about `looponfailroots` deprecation --
+     "ignore::DeprecationWarning:xdist",
+ 
++    # -- pyparsing 3.x deprecated many method names --
++    "ignore::DeprecationWarning:pyparsing",
++
+     # -- pytest complains when pytest-xdist is not installed --
+     "ignore:Unknown config option. looponfailroots:pytest.PytestConfigWarning",
+ ]
+@@ -124,4 +127,3 @@ known-local-folder = ["helpers"]
+ 
+ [tool.setuptools.dynamic]
+ version = {attr = "docx.__version__"}
+-
+diff --git a/src/docx/blkcntnr.py b/src/docx/blkcntnr.py
+index 82c7ef7..7f58a38 100644
+--- a/src/docx/blkcntnr.py
++++ b/src/docx/blkcntnr.py
+@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Iterator
+ 
+ from typing_extensions import TypeAlias
+ 
++from docx.oxml.ns import qn
+ from docx.oxml.table import CT_Tbl
+ from docx.oxml.text.paragraph import CT_P
+ from docx.shared import StoryChild
+@@ -23,6 +24,7 @@ if TYPE_CHECKING:
+     from docx.oxml.document import CT_Body
+     from docx.oxml.section import CT_HdrFtr
+     from docx.oxml.table import CT_Tc
++    from docx.revision import TrackedDeletion, TrackedInsertion
+     from docx.shared import Length
+     from docx.styles.style import ParagraphStyle
+     from docx.table import Table
+@@ -71,12 +73,41 @@ class BlockItemContainer(StoryChild):
+         self._element._insert_tbl(tbl)  # pyright: ignore[reportPrivateUsage]
+         return Table(tbl, self)
+ 
+-    def iter_inner_content(self) -> Iterator[Paragraph | Table]:
+-        """Generate each `Paragraph` or `Table` in this container in document order."""
++    def iter_inner_content(
++        self, include_revisions: bool = False
++    ) -> Iterator[Paragraph | Table | TrackedInsertion | TrackedDeletion]:
++        """Generate each `Paragraph` or `Table` in this container in document order.
++
++        Args:
++            include_revisions: If True, also yields `TrackedInsertion` and
++                `TrackedDeletion` objects for block-level tracked changes
++                (`w:ins` and `w:del` elements that wrap paragraphs or tables).
++                Defaults to False for backward compatibility.
++
++        Yields:
++            Paragraph, Table, TrackedInsertion, or TrackedDeletion objects in
++            document order.
++        """
++        from docx.revision import TrackedDeletion, TrackedInsertion
+         from docx.table import Table
+ 
+-        for element in self._element.inner_content_elements:
+-            yield (Paragraph(element, self) if isinstance(element, CT_P) else Table(element, self))
++        if include_revisions:
++            elements = getattr(self._element, "inner_content_with_revisions", None)
++            if elements is None:
++                elements = self._element.inner_content_elements
++        else:
++            elements = self._element.inner_content_elements
++
++        for element in elements:
++            tag = element.tag  # pyright: ignore[reportUnknownMemberType]
++            if tag == qn("w:p"):
++                yield Paragraph(element, self)
++            elif tag == qn("w:tbl"):
++                yield Table(element, self)
++            elif tag == qn("w:ins"):
++                yield TrackedInsertion(element, self)  # pyright: ignore[reportArgumentType]
++            elif tag == qn("w:del"):
++                yield TrackedDeletion(element, self)  # pyright: ignore[reportArgumentType]
+ 
+     @property
+     def paragraphs(self):
+diff --git a/src/docx/document.py b/src/docx/document.py
+index 73757b4..9bc2d68 100644
+--- a/src/docx/document.py
++++ b/src/docx/document.py
+@@ -229,6 +229,46 @@ class Document(ElementProxy):
+         """
+         return self._body.tables
+ 
++    def find_and_replace_tracked(
++        self,
++        search_text: str,
++        replace_text: str,
++        author: str = "",
++        comment: str | None = None,
++    ) -> int:
++        """Find and replace all occurrences of `search_text` with `replace_text` using track changes.
++
++        This method searches all paragraphs in the document (including those in tables)
++        and replaces text at the word level, creating tracked deletions and insertions.
++        If `comment` is provided, a comment is attached to each replacement explaining
++        the change.
++
++        Args:
++            search_text: Text to find and replace.
++            replace_text: Text to insert in place of search_text.
++            author: Author name for the revision. Defaults to empty string.
++            comment: Optional comment text to attach to each replacement.
++
++        Returns:
++            The total number of replacements made across the document.
++        """
++        total_count = 0
++
++        for para in self.paragraphs:
++            total_count += para.replace_tracked(
++                search_text, replace_text, author=author, comment=comment
++            )
++
++        for table in self.tables:
++            for row in table.rows:
++                for cell in row.cells:
++                    for para in cell.paragraphs:
++                        total_count += para.replace_tracked(
++                            search_text, replace_text, author=author, comment=comment
++                        )
++
++        return total_count
++
+     @property
+     def _block_width(self) -> Length:
+         """A |Length| object specifying the space between margins in last section."""
+diff --git a/src/docx/oxml/__init__.py b/src/docx/oxml/__init__.py
+index 37f608c..5456f97 100644
+--- a/src/docx/oxml/__init__.py
++++ b/src/docx/oxml/__init__.py
+@@ -82,6 +82,7 @@ register_element_cls("w:t", CT_Text)
+ 
+ register_element_cls("w:evenAndOddHeaders", CT_OnOff)
+ register_element_cls("w:titlePg", CT_OnOff)
++register_element_cls("w:trackRevisions", CT_OnOff)
+ 
+ # ---------------------------------------------------------------------------
+ # other custom element class mappings
+@@ -249,3 +250,22 @@ register_element_cls("w:spacing", CT_Spacing)
+ register_element_cls("w:tab", CT_TabStop)
+ register_element_cls("w:tabs", CT_TabStops)
+ register_element_cls("w:widowControl", CT_OnOff)
++
++from .revision import (
++    CT_PPrChange,
++    CT_RPrChange,
++    CT_RunTrackChange,
++    CT_SectPrChange,
++    CT_TblPrChange,
++    CT_TcPrChange,
++    CT_TrPrChange,
++)
++
++register_element_cls("w:ins", CT_RunTrackChange)
++register_element_cls("w:del", CT_RunTrackChange)
++register_element_cls("w:rPrChange", CT_RPrChange)
++register_element_cls("w:pPrChange", CT_PPrChange)
++register_element_cls("w:sectPrChange", CT_SectPrChange)
++register_element_cls("w:tblPrChange", CT_TblPrChange)
++register_element_cls("w:tcPrChange", CT_TcPrChange)
++register_element_cls("w:trPrChange", CT_TrPrChange)
+diff --git a/src/docx/oxml/document.py b/src/docx/oxml/document.py
+index 36819ef..0291e01 100644
+--- a/src/docx/oxml/document.py
++++ b/src/docx/oxml/document.py
+@@ -2,12 +2,13 @@
+ 
+ from __future__ import annotations
+ 
+-from typing import TYPE_CHECKING, Callable, List
++from typing import TYPE_CHECKING, Callable, List, Union
+ 
+ from docx.oxml.section import CT_SectPr
+ from docx.oxml.xmlchemy import BaseOxmlElement, ZeroOrMore, ZeroOrOne
+ 
+ if TYPE_CHECKING:
++    from docx.oxml.revision import CT_RunTrackChange
+     from docx.oxml.table import CT_Tbl
+     from docx.oxml.text.paragraph import CT_P
+ 
+@@ -80,9 +81,18 @@ class CT_Body(BaseOxmlElement):
+ 
+     @property
+     def inner_content_elements(self) -> List[CT_P | CT_Tbl]:
+-        """Generate all `w:p` and `w:tbl` elements in this document-body.
++        """All `w:p` and `w:tbl` elements directly in this document-body.
+ 
+-        Elements appear in document order. Elements shaded by nesting in a `w:ins` or
+-        other "wrapper" element will not be included.
++        Elements appear in document order. Elements nested in `w:ins` or `w:del`
++        are NOT included. Use `inner_content_with_revisions` to include those.
+         """
+         return self.xpath("./w:p | ./w:tbl")
++
++    @property
++    def inner_content_with_revisions(self) -> List[Union[CT_P, CT_Tbl, CT_RunTrackChange]]:
++        """All `w:p`, `w:tbl`, `w:ins`, and `w:del` elements in this document-body.
++
++        Elements appear in document order. This includes block-level tracked changes
++        (`w:ins` and `w:del` elements that wrap paragraphs or tables).
++        """
++        return self.xpath("./w:p | ./w:tbl | ./w:ins | ./w:del")
+diff --git a/src/docx/oxml/revision.py b/src/docx/oxml/revision.py
+new file mode 100644
+index 0000000..5d8d965
+--- /dev/null
++++ b/src/docx/oxml/revision.py
+@@ -0,0 +1,134 @@
++"""Custom element classes for revision tracking (tracked changes)."""
++
++from __future__ import annotations
++
++import datetime as dt
++from typing import TYPE_CHECKING, List
++
++from docx.oxml.ns import qn
++from docx.oxml.simpletypes import ST_String, XsdInt
++from docx.oxml.xmlchemy import (
++    BaseOxmlElement,
++    OptionalAttribute,
++    RequiredAttribute,
++    ZeroOrMore,
++    ZeroOrOne,
++)
++
++if TYPE_CHECKING:
++    from docx.oxml.table import CT_Tbl
++    from docx.oxml.text.paragraph import CT_P
++    from docx.oxml.text.run import CT_R
++
++
++class CT_TrackChange(BaseOxmlElement):
++    """Base class for tracked change elements.
++
++    This serves as the base for `w:ins`, `w:del`, and other revision tracking elements.
++    Provides common attributes: `w:id`, `w:author`, and `w:date`.
++    """
++
++    id: int = RequiredAttribute("w:id", XsdInt)  # pyright: ignore[reportAssignmentType]
++    author: str = RequiredAttribute("w:author", ST_String)  # pyright: ignore[reportAssignmentType]
++    date: str | None = OptionalAttribute("w:date", ST_String)  # pyright: ignore[reportAssignmentType]
++
++    @property
++    def date_value(self) -> dt.datetime | None:
++        """The `w:date` attribute as a datetime object, or None if not set."""
++        date_str = self.date
++        if date_str is None:
++            return None
++        try:
++            return dt.datetime.fromisoformat(date_str.replace("Z", "+00:00"))
++        except ValueError:
++            return None
++
++    @date_value.setter
++    def date_value(self, value: dt.datetime | None):
++        """Set the `w:date` attribute from a datetime object."""
++        if value is None:
++            date_qn = qn("w:date")
++            if date_qn in self.attrib:  # pyright: ignore[reportUnknownMemberType]
++                del self.attrib[date_qn]  # pyright: ignore[reportUnknownMemberType]
++        else:
++            self.date = value.strftime("%Y-%m-%dT%H:%M:%SZ")
++
++
++class CT_RunTrackChange(CT_TrackChange):
++    """`w:ins` or `w:del` element containing run-level content.
++
++    Used for tracking insertions and deletions at the run level within a paragraph,
++    or at the block level containing paragraphs and tables.
++    """
++
++    p_lst: List[CT_P]
++    tbl_lst: List[CT_Tbl]
++    r_lst: List[CT_R]
++
++    p = ZeroOrMore("w:p")
++    tbl = ZeroOrMore("w:tbl")
++    r = ZeroOrMore("w:r")
++
++    @property
++    def inner_content_elements(self) -> List[CT_P | CT_Tbl]:
++        """All `w:p` and `w:tbl` elements in this tracked change, in document order."""
++        return self.xpath("./w:p | ./w:tbl")
++
++    @property
++    def run_content_elements(self) -> List[CT_R]:
++        """All `w:r` elements in this tracked change, in document order."""
++        return self.xpath("./w:r")
++
++
++class CT_RPrChange(CT_TrackChange):
++    """`w:rPrChange` element, tracking changes to run properties.
++
++    Contains the previous run properties before the change was made.
++    """
++
++    rPr: BaseOxmlElement | None = ZeroOrOne("w:rPr")  # pyright: ignore[reportAssignmentType]
++
++
++class CT_PPrChange(CT_TrackChange):
++    """`w:pPrChange` element, tracking changes to paragraph properties.
++
++    Contains the previous paragraph properties before the change was made.
++    """
++
++    pPr: BaseOxmlElement | None = ZeroOrOne("w:pPr")  # pyright: ignore[reportAssignmentType]
++
++
++class CT_SectPrChange(CT_TrackChange):
++    """`w:sectPrChange` element, tracking changes to section properties.
++
++    Contains the previous section properties before the change was made.
++    """
++
++    sectPr: BaseOxmlElement | None = ZeroOrOne("w:sectPr")  # pyright: ignore[reportAssignmentType]
++
++
++class CT_TblPrChange(CT_TrackChange):
++    """`w:tblPrChange` element, tracking changes to table properties.
++
++    Contains the previous table properties before the change was made.
++    """
++
++    tblPr: BaseOxmlElement | None = ZeroOrOne("w:tblPr")  # pyright: ignore[reportAssignmentType]
++
++
++class CT_TcPrChange(CT_TrackChange):
++    """`w:tcPrChange` element, tracking changes to table cell properties.
++
++    Contains the previous cell properties before the change was made.
++    """
++
++    tcPr: BaseOxmlElement | None = ZeroOrOne("w:tcPr")  # pyright: ignore[reportAssignmentType]
++
++
++class CT_TrPrChange(CT_TrackChange):
++    """`w:trPrChange` element, tracking changes to table row properties.
++
++    Contains the previous row properties before the change was made.
++    """
++
++    trPr: BaseOxmlElement | None = ZeroOrOne("w:trPr")  # pyright: ignore[reportAssignmentType]
+\ No newline at end of file
+diff --git a/src/docx/oxml/settings.py b/src/docx/oxml/settings.py
+index d5bb41a..3944997 100644
+--- a/src/docx/oxml/settings.py
++++ b/src/docx/oxml/settings.py
+@@ -14,7 +14,9 @@ class CT_Settings(BaseOxmlElement):
+     """`w:settings` element, root element for the settings part."""
+ 
+     get_or_add_evenAndOddHeaders: Callable[[], CT_OnOff]
++    get_or_add_trackRevisions: Callable[[], CT_OnOff]
+     _remove_evenAndOddHeaders: Callable[[], None]
++    _remove_trackRevisions: Callable[[], None]
+ 
+     _tag_seq = (
+         "w:writeProtection",
+@@ -116,11 +118,29 @@ class CT_Settings(BaseOxmlElement):
+         "w:decimalSymbol",
+         "w:listSeparator",
+     )
++    trackRevisions: CT_OnOff | None = ZeroOrOne(  # pyright: ignore[reportAssignmentType]
++        "w:trackRevisions", successors=_tag_seq[32:]
++    )
+     evenAndOddHeaders: CT_OnOff | None = ZeroOrOne(  # pyright: ignore[reportAssignmentType]
+         "w:evenAndOddHeaders", successors=_tag_seq[48:]
+     )
+     del _tag_seq
+ 
++    @property
++    def trackRevisions_val(self) -> bool:
++        """Value of `w:trackRevisions/@w:val` or False if not present."""
++        trackRevisions = self.trackRevisions
++        if trackRevisions is None:
++            return False
++        return trackRevisions.val
++
++    @trackRevisions_val.setter
++    def trackRevisions_val(self, value: bool | None):
++        if value is None or value is False:
++            self._remove_trackRevisions()
++            return
++        self.get_or_add_trackRevisions().val = value
++
+     @property
+     def evenAndOddHeaders_val(self) -> bool:
+         """Value of `w:evenAndOddHeaders/@w:val` or |None| if not present."""
+diff --git a/src/docx/oxml/text/paragraph.py b/src/docx/oxml/text/paragraph.py
+index 63e96f3..54ad408 100644
+--- a/src/docx/oxml/text/paragraph.py
++++ b/src/docx/oxml/text/paragraph.py
+@@ -4,13 +4,14 @@
+ 
+ from __future__ import annotations
+ 
+-from typing import TYPE_CHECKING, Callable, List, cast
++from typing import TYPE_CHECKING, Callable, List, Union, cast
+ 
+ from docx.oxml.parser import OxmlElement
+ from docx.oxml.xmlchemy import BaseOxmlElement, ZeroOrMore, ZeroOrOne
+ 
+ if TYPE_CHECKING:
+     from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
++    from docx.oxml.revision import CT_RunTrackChange
+     from docx.oxml.section import CT_SectPr
+     from docx.oxml.text.hyperlink import CT_Hyperlink
+     from docx.oxml.text.pagebreak import CT_LastRenderedPageBreak
+@@ -59,6 +60,17 @@ class CT_P(BaseOxmlElement):
+         """Run and hyperlink children of the `w:p` element, in document order."""
+         return self.xpath("./w:r | ./w:hyperlink")
+ 
++    @property
++    def inner_content_with_revisions(
++        self,
++    ) -> List[Union[CT_R, CT_Hyperlink, CT_RunTrackChange]]:
++        """Run, hyperlink, and revision children of the `w:p` element.
++
++        Returns elements in document order, including `w:ins` and `w:del` elements
++        that wrap runs at the paragraph level.
++        """
++        return self.xpath("./w:r | ./w:hyperlink | ./w:ins | ./w:del")
++
+     @property
+     def lastRenderedPageBreaks(self) -> List[CT_LastRenderedPageBreak]:
+         """All `w:lastRenderedPageBreak` descendants of this paragraph.
+diff --git a/src/docx/revision.py b/src/docx/revision.py
+new file mode 100644
+index 0000000..76a9548
+--- /dev/null
++++ b/src/docx/revision.py
+@@ -0,0 +1,255 @@
++"""Provides TrackedInsertion and TrackedDeletion classes for accessing and manipulating
++tracked changes (revisions) in a Word document."""
++
++from __future__ import annotations
++
++import datetime as dt
++from typing import TYPE_CHECKING, Iterator, List
++
++from docx.oxml.ns import qn
++from docx.shared import Parented
++
++if TYPE_CHECKING:
++    import docx.types as t
++    from docx.oxml.revision import CT_RunTrackChange
++    from docx.table import Table
++    from docx.text.paragraph import Paragraph
++    from docx.text.run import Run
++
++
++class TrackedChange(Parented):
++    """Base class for tracked change proxy objects.
++
++    Provides common functionality for both insertions and deletions.
++    """
++
++    def __init__(self, element: CT_RunTrackChange, parent: t.ProvidesStoryPart):
++        super().__init__(parent)
++        self._element = element
++
++    @property
++    def author(self) -> str:
++        """The author who made this change."""
++        return self._element.author
++
++    @author.setter
++    def author(self, value: str):
++        self._element.author = value
++
++    @property
++    def date(self) -> dt.datetime | None:
++        """The date/time when this change was made, or None if not recorded."""
++        return self._element.date_value
++
++    @date.setter
++    def date(self, value: dt.datetime | None):
++        self._element.date_value = value
++
++    @property
++    def revision_id(self) -> int:
++        """The unique identifier for this revision."""
++        return self._element.id
++
++    @revision_id.setter
++    def revision_id(self, value: int):
++        self._element.id = value
++
++    def accept(self) -> None:
++        """Accept this tracked change.
++
++        For an insertion, this removes the revision wrapper, keeping the content.
++        For a deletion, this removes both the wrapper and the content.
++        """
++        raise NotImplementedError("Subclasses must implement accept()")
++
++    def reject(self) -> None:
++        """Reject this tracked change.
++
++        For an insertion, this removes both the wrapper and the content.
++        For a deletion, this removes the revision wrapper, keeping the content.
++        """
++        raise NotImplementedError("Subclasses must implement reject()")
++
++
++class TrackedInsertion(TrackedChange):
++    """Proxy object wrapping a `w:ins` element.
++
++    Represents content that was inserted while track changes was enabled.
++    The inserted content can be paragraphs, tables, or runs depending on context.
++    """
++
++    @property
++    def is_block_level(self) -> bool:
++        """True if this insertion contains block-level content (paragraphs/tables)."""
++        return bool(self._element.inner_content_elements)
++
++    @property
++    def is_run_level(self) -> bool:
++        """True if this insertion contains run-level content."""
++        return bool(self._element.run_content_elements)
++
++    def iter_inner_content(self) -> Iterator[Paragraph | Table]:
++        """Generate Paragraph or Table objects for block-level inserted content."""
++        from docx.table import Table
++        from docx.text.paragraph import Paragraph
++
++        for element in self._element.inner_content_elements:
++            tag = element.tag  # pyright: ignore[reportUnknownMemberType]
++            if tag == qn("w:p"):
++                yield Paragraph(
++                    element,
++                    self._parent,  # pyright: ignore[reportArgumentType]
++                )
++            elif tag == qn("w:tbl"):
++                yield Table(
++                    element,
++                    self._parent,  # pyright: ignore[reportArgumentType]
++                )
++
++    def iter_runs(self) -> Iterator[Run]:
++        """Generate Run objects for run-level inserted content."""
++        from docx.text.run import Run
++
++        for r in self._element.run_content_elements:
++            yield Run(r, self._parent)  # pyright: ignore[reportArgumentType]
++
++    @property
++    def paragraphs(self) -> List[Paragraph]:
++        """List of paragraphs in this insertion (for block-level insertions)."""
++        from docx.text.paragraph import Paragraph
++
++        return [
++            Paragraph(p, self._parent)  # pyright: ignore[reportArgumentType]
++            for p in self._element.p_lst
++        ]
++
++    @property
++    def runs(self) -> List[Run]:
++        """List of runs in this insertion (for run-level insertions)."""
++        from docx.text.run import Run
++
++        return [
++            Run(r, self._parent)  # pyright: ignore[reportArgumentType]
++            for r in self._element.r_lst
++        ]
++
++    @property
++    def text(self) -> str:
++        """The text content of this insertion.
++
++        For block-level insertions, returns concatenated text of all paragraphs.
++        For run-level insertions, returns concatenated text of all runs.
++        """
++        if self.is_block_level:
++            return "\n".join(p.text for p in self.paragraphs)
++        return "".join(r.text for r in self.runs)
++
++    def accept(self) -> None:
++        """Accept this insertion, keeping the content but removing the revision wrapper."""
++        parent = self._element.getparent()
++        if parent is None:
++            return
++
++        index = list(parent).index(self._element)
++        for child in reversed(list(self._element)):
++            parent.insert(index, child)
++
++        parent.remove(self._element)
++
++    def reject(self) -> None:
++        """Reject this insertion, removing both the content and the revision wrapper."""
++        parent = self._element.getparent()
++        if parent is not None:
++            parent.remove(self._element)
++
++
++class TrackedDeletion(TrackedChange):
++    """Proxy object wrapping a `w:del` element.
++
++    Represents content that was deleted while track changes was enabled.
++    The deleted content is still present in the document but marked as deleted.
++    """
++
++    @property
++    def is_block_level(self) -> bool:
++        """True if this deletion contains block-level content (paragraphs/tables)."""
++        return bool(self._element.inner_content_elements)
++
++    @property
++    def is_run_level(self) -> bool:
++        """True if this deletion contains run-level content."""
++        return bool(self._element.run_content_elements)
++
++    def iter_inner_content(self) -> Iterator[Paragraph | Table]:
++        """Generate Paragraph or Table objects for block-level deleted content."""
++        from docx.table import Table
++        from docx.text.paragraph import Paragraph
++
++        for element in self._element.inner_content_elements:
++            tag = element.tag  # pyright: ignore[reportUnknownMemberType]
++            if tag == qn("w:p"):
++                yield Paragraph(
++                    element,
++                    self._parent,  # pyright: ignore[reportArgumentType]
++                )
++            elif tag == qn("w:tbl"):
++                yield Table(
++                    element,
++                    self._parent,  # pyright: ignore[reportArgumentType]
++                )
++
++    def iter_runs(self) -> Iterator[Run]:
++        """Generate Run objects for run-level deleted content."""
++        from docx.text.run import Run
++
++        for r in self._element.run_content_elements:
++            yield Run(r, self._parent)  # pyright: ignore[reportArgumentType]
++
++    @property
++    def paragraphs(self) -> List[Paragraph]:
++        """List of paragraphs in this deletion (for block-level deletions)."""
++        from docx.text.paragraph import Paragraph
++
++        return [
++            Paragraph(p, self._parent)  # pyright: ignore[reportArgumentType]
++            for p in self._element.p_lst
++        ]
++
++    @property
++    def runs(self) -> List[Run]:
++        """List of runs in this deletion (for run-level deletions)."""
++        from docx.text.run import Run
++
++        return [
++            Run(r, self._parent)  # pyright: ignore[reportArgumentType]
++            for r in self._element.r_lst
++        ]
++
++    @property
++    def text(self) -> str:
++        """The text content of this deletion.
++
++        For block-level deletions, returns concatenated text of all paragraphs.
++        For run-level deletions, returns concatenated text of all runs.
++        """
++        if self.is_block_level:
++            return "\n".join(p.text for p in self.paragraphs)
++        return "".join(r.text for r in self.runs)
++
++    def accept(self) -> None:
++        """Accept this deletion, removing both the content and the revision wrapper."""
++        parent = self._element.getparent()
++        if parent is not None:
++            parent.remove(self._element)
++
++    def reject(self) -> None:
++        """Reject this deletion, keeping the content but removing the revision wrapper."""
++        parent = self._element.getparent()
++        if parent is None:
++            return
++
++        index = list(parent).index(self._element)
++        for child in reversed(list(self._element)):
++            parent.insert(index, child)
++
++        parent.remove(self._element)
+diff --git a/src/docx/settings.py b/src/docx/settings.py
+index 0a5aa2f..d7667e6 100644
+--- a/src/docx/settings.py
++++ b/src/docx/settings.py
+@@ -33,3 +33,16 @@ class Settings(ElementProxy):
+     @odd_and_even_pages_header_footer.setter
+     def odd_and_even_pages_header_footer(self, value: bool):
+         self._settings.evenAndOddHeaders_val = value
++
++    @property
++    def track_revisions(self) -> bool:
++        """True if track-changes is enabled for this document.
++
++        Read/write. When True, changes made to the document will be tracked as
++        revisions. When False, changes are applied directly without tracking.
++        """
++        return self._settings.trackRevisions_val
++
++    @track_revisions.setter
++    def track_revisions(self, value: bool):
++        self._settings.trackRevisions_val = value
+diff --git a/src/docx/text/paragraph.py b/src/docx/text/paragraph.py
+index 234ea66..90a7b9b 100644
+--- a/src/docx/text/paragraph.py
++++ b/src/docx/text/paragraph.py
+@@ -4,8 +4,13 @@ from __future__ import annotations
+ 
+ from typing import TYPE_CHECKING, Iterator, List, cast
+ 
++import datetime as dt
++
+ from docx.enum.style import WD_STYLE_TYPE
++from docx.oxml.ns import qn
++from docx.oxml.parser import OxmlElement
+ from docx.oxml.text.run import CT_R
++from docx.revision import TrackedDeletion, TrackedInsertion
+ from docx.shared import StoryChild
+ from docx.styles.style import ParagraphStyle
+ from docx.text.hyperlink import Hyperlink
+@@ -43,6 +48,65 @@ class Paragraph(StoryChild):
+             run.style = style
+         return run
+ 
++    def add_run_tracked(
++        self,
++        text: str | None = None,
++        style: str | CharacterStyle | None = None,
++        author: str = "",
++        revision_id: int | None = None,
++    ) -> TrackedInsertion:
++        """Append a tracked insertion containing a run with the specified text.
++
++        The run is wrapped in a `w:ins` element, marking it as inserted content
++        when track changes is enabled.
++
++        Args:
++            text: Text to add to the run.
++            style: Character style to apply to the run.
++            author: Author name for the revision. Defaults to empty string.
++            revision_id: Unique ID for this revision. Auto-generated if not provided.
++
++        Returns:
++            A TrackedInsertion object wrapping the `w:ins` element.
++        """
++        if revision_id is None:
++            revision_id = self._next_revision_id()
++
++        ins = OxmlElement(
++            "w:ins",
++            attrs={
++                qn("w:id"): str(revision_id),
++                qn("w:author"): author,
++                qn("w:date"): dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
++            },
++        )
++
++        r = OxmlElement("w:r")
++        ins.append(r)
++        self._p.append(ins)  # pyright: ignore[reportUnknownMemberType]
++
++        tracked_insertion = TrackedInsertion(ins, self)  # pyright: ignore[reportArgumentType]
++        if text:
++            for run in tracked_insertion.runs:
++                run.text = text
++        if style:
++            for run in tracked_insertion.runs:
++                run.style = style
++
++        return tracked_insertion
++
++    def _next_revision_id(self) -> int:
++        """Generate the next unique revision ID for this document."""
++        max_id = 0
++        for ins_or_del in self._p.xpath("//w:ins | //w:del"):
++            id_val = ins_or_del.get(qn("w:id"))  # pyright: ignore[reportUnknownMemberType]
++            if id_val is not None:
++                try:
++                    max_id = max(max_id, int(id_val))
++                except ValueError:
++                    pass
++        return max_id + 1
++
+     @property
+     def alignment(self) -> WD_PARAGRAPH_ALIGNMENT | None:
+         """A member of the :ref:`WdParagraphAlignment` enumeration specifying the
+@@ -91,20 +155,41 @@ class Paragraph(StoryChild):
+             paragraph.style = style
+         return paragraph
+ 
+-    def iter_inner_content(self) -> Iterator[Run | Hyperlink]:
++    def iter_inner_content(
++        self, include_revisions: bool = False
++    ) -> Iterator[Run | Hyperlink | TrackedInsertion | TrackedDeletion]:
+         """Generate the runs and hyperlinks in this paragraph, in the order they appear.
+ 
+         The content in a paragraph consists of both runs and hyperlinks. This method
+         allows accessing each of those separately, in document order, for when the
+         precise position of the hyperlink within the paragraph text is important. Note
+         that a hyperlink itself contains runs.
++
++        Args:
++            include_revisions: If True, also yields `TrackedInsertion` and
++                `TrackedDeletion` objects for run-level tracked changes
++                (`w:ins` and `w:del` elements that wrap runs).
++                Defaults to False for backward compatibility.
++
++        Yields:
++            Run, Hyperlink, TrackedInsertion, or TrackedDeletion objects in
++            document order.
+         """
+-        for r_or_hlink in self._p.inner_content_elements:
+-            yield (
+-                Run(r_or_hlink, self)
+-                if isinstance(r_or_hlink, CT_R)
+-                else Hyperlink(r_or_hlink, self)
+-            )
++        if include_revisions:
++            elements = self._p.inner_content_with_revisions
++        else:
++            elements = self._p.inner_content_elements
++
++        for element in elements:
++            tag = element.tag  # pyright: ignore[reportUnknownMemberType]
++            if tag == qn("w:r"):
++                yield Run(element, self)
++            elif tag == qn("w:hyperlink"):
++                yield Hyperlink(element, self)  # pyright: ignore[reportArgumentType]
++            elif tag == qn("w:ins"):
++                yield TrackedInsertion(element, self)  # pyright: ignore[reportArgumentType]
++            elif tag == qn("w:del"):
++                yield TrackedDeletion(element, self)  # pyright: ignore[reportArgumentType]
+ 
+     @property
+     def paragraph_format(self):
+@@ -167,6 +252,433 @@ class Paragraph(StoryChild):
+         self.clear()
+         self.add_run(text)
+ 
++    def replace_tracked_at(
++        self,
++        start: int,
++        end: int,
++        replace_text: str,
++        author: str = "",
++        comment: str | None = None,
++    ) -> None:
++        """Replace text at character offsets `start` to `end` using track changes.
++
++        Creates a tracked deletion of the text at positions [start, end) and a tracked
++        insertion of `replace_text` at that position. The offsets are relative to
++        `paragraph.text`.
++
++        Args:
++            start: Starting character offset (0-based, inclusive).
++            end: Ending character offset (0-based, exclusive).
++            replace_text: Text to insert in place of the deleted text.
++            author: Author name for the revision. Defaults to empty string.
++            comment: Optional comment text to attach to the replacement.
++
++        Raises:
++            ValueError: If start or end are out of bounds or start >= end.
++        """
++        para_text = self.text
++        if start < 0 or end > len(para_text) or start >= end:
++            raise ValueError(
++                f"Invalid offsets: start={start}, end={end} for text of length {len(para_text)}"
++            )
++
++        run_boundaries = self._get_run_boundaries()
++        if not run_boundaries:
++            raise ValueError("Paragraph has no runs")
++
++        start_run_idx, start_offset_in_run = self._find_run_at_offset(run_boundaries, start)
++        end_run_idx, end_offset_in_run = self._find_run_at_offset(run_boundaries, end)
++
++        now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
++        runs = list(self.runs)
++
++        if start_run_idx == end_run_idx:
++            run = runs[start_run_idx]
++            self._replace_within_single_run(
++                run, start_offset_in_run, end_offset_in_run, replace_text, author, now, comment
++            )
++        else:
++            self._replace_across_multiple_runs(
++                runs,
++                start_run_idx,
++                start_offset_in_run,
++                end_run_idx,
++                end_offset_in_run,
++                replace_text,
++                author,
++                now,
++                comment,
++            )
++
++    def _get_run_boundaries(self) -> List[tuple[int, int, int]]:
++        """Return list of (run_index, start_offset, end_offset) for each run."""
++        boundaries = []
++        offset = 0
++        for i, run in enumerate(self.runs):
++            run_len = len(run.text)
++            boundaries.append((i, offset, offset + run_len))
++            offset += run_len
++        return boundaries
++
++    def _find_run_at_offset(
++        self, boundaries: List[tuple[int, int, int]], offset: int
++    ) -> tuple[int, int]:
++        """Find which run contains the given offset and the offset within that run."""
++        for run_idx, run_start, run_end in boundaries:
++            if run_start <= offset < run_end:
++                return run_idx, offset - run_start
++            elif offset == run_end and run_idx == len(boundaries) - 1:
++                return run_idx, offset - run_start
++        last_idx, last_start, _ = boundaries[-1]
++        return last_idx, offset - last_start
++
++    def _replace_within_single_run(
++        self,
++        run: Run,
++        start_in_run: int,
++        end_in_run: int,
++        replace_text: str,
++        author: str,
++        now: str,
++        comment: str | None,
++    ) -> None:
++        """Replace text within a single run using tracked changes."""
++        text = run.text
++        deleted_text = text[start_in_run:end_in_run]
++        before_text = text[:start_in_run]
++        after_text = text[end_in_run:]
++
++        r_elem = run._r
++        parent = r_elem.getparent()
++        if parent is None:
++            return
++
++        index = list(parent).index(r_elem)
++        parent.remove(r_elem)
++
++        insert_idx = index
++
++        if before_text:
++            before_r = OxmlElement("w:r")
++            before_t = OxmlElement("w:t")
++            before_t.text = before_text
++            if before_text.startswith(" ") or before_text.endswith(" "):
++                before_t.set(qn("xml:space"), "preserve")
++            before_r.append(before_t)
++            parent.insert(insert_idx, before_r)
++            insert_idx += 1
++
++        rev_id = self._next_revision_id()
++        del_elem = OxmlElement(
++            "w:del",
++            attrs={
++                qn("w:id"): str(rev_id),
++                qn("w:author"): author,
++                qn("w:date"): now,
++            },
++        )
++        del_r = OxmlElement("w:r")
++        del_text_elem = OxmlElement("w:delText")
++        del_text_elem.text = deleted_text
++        del_r.append(del_text_elem)
++        del_elem.append(del_r)
++        parent.insert(insert_idx, del_elem)
++        insert_idx += 1
++
++        comment_id = None
++        if comment:
++            doc_comments = self.part._document_part.comments  # pyright: ignore[reportAttributeAccessIssue]
++            comment_obj = doc_comments.add_comment(text=comment, author=author)
++            comment_id = comment_obj.comment_id
++            comment_start = OxmlElement(
++                "w:commentRangeStart", attrs={qn("w:id"): str(comment_id)}
++            )
++            parent.insert(insert_idx, comment_start)
++            insert_idx += 1
++
++        rev_id = self._next_revision_id()
++        ins_elem = OxmlElement(
++            "w:ins",
++            attrs={
++                qn("w:id"): str(rev_id),
++                qn("w:author"): author,
++                qn("w:date"): now,
++            },
++        )
++        ins_r = OxmlElement("w:r")
++        ins_t = OxmlElement("w:t")
++        ins_t.text = replace_text
++        ins_r.append(ins_t)
++        ins_elem.append(ins_r)
++        parent.insert(insert_idx, ins_elem)
++        insert_idx += 1
++
++        if comment_id is not None:
++            comment_end = OxmlElement(
++                "w:commentRangeEnd", attrs={qn("w:id"): str(comment_id)}
++            )
++            parent.insert(insert_idx, comment_end)
++            insert_idx += 1
++            comment_ref_run = cast(CT_R, OxmlElement("w:r"))
++            comment_ref_rPr = comment_ref_run.get_or_add_rPr()
++            comment_ref_rPr.style = "CommentReference"
++            comment_ref_run.append(
++                OxmlElement("w:commentReference", attrs={qn("w:id"): str(comment_id)})
++            )
++            parent.insert(insert_idx, comment_ref_run)
++            insert_idx += 1
++
++        if after_text:
++            after_r = OxmlElement("w:r")
++            after_t = OxmlElement("w:t")
++            after_t.text = after_text
++            if after_text.startswith(" ") or after_text.endswith(" "):
++                after_t.set(qn("xml:space"), "preserve")
++            after_r.append(after_t)
++            parent.insert(insert_idx, after_r)
++
++    def _replace_across_multiple_runs(
++        self,
++        runs: List[Run],
++        start_run_idx: int,
++        start_offset_in_run: int,
++        end_run_idx: int,
++        end_offset_in_run: int,
++        replace_text: str,
++        author: str,
++        now: str,
++        comment: str | None,
++    ) -> None:
++        """Replace text that spans multiple runs using tracked changes."""
++        start_run = runs[start_run_idx]
++        start_text = start_run.text
++        before_text = start_text[:start_offset_in_run]
++        deleted_from_start = start_text[start_offset_in_run:]
++
++        end_run = runs[end_run_idx]
++        end_text = end_run.text
++        deleted_from_end = end_text[:end_offset_in_run]
++        after_text = end_text[end_offset_in_run:]
++
++        middle_deleted = ""
++        for i in range(start_run_idx + 1, end_run_idx):
++            middle_deleted += runs[i].text
++
++        full_deleted_text = deleted_from_start + middle_deleted + deleted_from_end
++
++        start_r_elem = start_run._r
++        parent = start_r_elem.getparent()
++        if parent is None:
++            return
++
++        index = list(parent).index(start_r_elem)
++        for i in range(start_run_idx, end_run_idx + 1):
++            run_elem = runs[i]._r
++            if run_elem.getparent() is parent:
++                parent.remove(run_elem)
++
++        insert_idx = index
++
++        if before_text:
++            before_r = OxmlElement("w:r")
++            before_t = OxmlElement("w:t")
++            before_t.text = before_text
++            if before_text.startswith(" ") or before_text.endswith(" "):
++                before_t.set(qn("xml:space"), "preserve")
++            before_r.append(before_t)
++            parent.insert(insert_idx, before_r)
++            insert_idx += 1
++
++        rev_id = self._next_revision_id()
++        del_elem = OxmlElement(
++            "w:del",
++            attrs={
++                qn("w:id"): str(rev_id),
++                qn("w:author"): author,
++                qn("w:date"): now,
++            },
++        )
++        del_r = OxmlElement("w:r")
++        del_text_elem = OxmlElement("w:delText")
++        del_text_elem.text = full_deleted_text
++        del_r.append(del_text_elem)
++        del_elem.append(del_r)
++        parent.insert(insert_idx, del_elem)
++        insert_idx += 1
++
++        comment_id = None
++        if comment:
++            doc_comments = self.part._document_part.comments  # pyright: ignore[reportAttributeAccessIssue]
++            comment_obj = doc_comments.add_comment(text=comment, author=author)
++            comment_id = comment_obj.comment_id
++            comment_start = OxmlElement(
++                "w:commentRangeStart", attrs={qn("w:id"): str(comment_id)}
++            )
++            parent.insert(insert_idx, comment_start)
++            insert_idx += 1
++
++        rev_id = self._next_revision_id()
++        ins_elem = OxmlElement(
++            "w:ins",
++            attrs={
++                qn("w:id"): str(rev_id),
++                qn("w:author"): author,
++                qn("w:date"): now,
++            },
++        )
++        ins_r = OxmlElement("w:r")
++        ins_t = OxmlElement("w:t")
++        ins_t.text = replace_text
++        ins_r.append(ins_t)
++        ins_elem.append(ins_r)
++        parent.insert(insert_idx, ins_elem)
++        insert_idx += 1
++
++        if comment_id is not None:
++            comment_end = OxmlElement(
++                "w:commentRangeEnd", attrs={qn("w:id"): str(comment_id)}
++            )
++            parent.insert(insert_idx, comment_end)
++            insert_idx += 1
++            comment_ref_run = cast(CT_R, OxmlElement("w:r"))
++            comment_ref_rPr = comment_ref_run.get_or_add_rPr()
++            comment_ref_rPr.style = "CommentReference"
++            comment_ref_run.append(
++                OxmlElement("w:commentReference", attrs={qn("w:id"): str(comment_id)})
++            )
++            parent.insert(insert_idx, comment_ref_run)
++            insert_idx += 1
++
++        if after_text:
++            after_r = OxmlElement("w:r")
++            after_t = OxmlElement("w:t")
++            after_t.text = after_text
++            if after_text.startswith(" ") or after_text.endswith(" "):
++                after_t.set(qn("xml:space"), "preserve")
++            after_r.append(after_t)
++            parent.insert(insert_idx, after_r)
++
++    def replace_tracked(
++        self,
++        search_text: str,
++        replace_text: str,
++        author: str = "",
++        comment: str | None = None,
++    ) -> int:
++        """Replace all occurrences of `search_text` with `replace_text` using track changes.
++
++        Each replacement creates a tracked deletion of `search_text` and a tracked
++        insertion of `replace_text`. If `comment` is provided, a comment is attached
++        to the replacement text explaining the change.
++
++        Args:
++            search_text: Text to find and replace.
++            replace_text: Text to insert in place of search_text.
++            author: Author name for the revision. Defaults to empty string.
++            comment: Optional comment text to attach to each replacement.
++
++        Returns:
++            The number of replacements made.
++        """
++        count = 0
++        now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
++
++        runs = list(self.runs)
++        for run in runs:
++            text = run.text
++            if search_text not in text:
++                continue
++
++            parts = text.split(search_text)
++
++            r_elem = run._r
++            parent = r_elem.getparent()
++            if parent is None:
++                continue
++            index = list(parent).index(r_elem)
++
++            parent.remove(r_elem)
++
++            insert_idx = index
++            for i, part in enumerate(parts):
++                if part:
++                    new_r = OxmlElement("w:r")
++                    new_t = OxmlElement("w:t")
++                    new_t.text = part
++                    if part.startswith(" ") or part.endswith(" "):
++                        new_t.set(qn("xml:space"), "preserve")
++                    new_r.append(new_t)
++                    parent.insert(insert_idx, new_r)
++                    insert_idx += 1
++
++                if i < len(parts) - 1:
++                    rev_id = self._next_revision_id()
++
++                    del_elem = OxmlElement(
++                        "w:del",
++                        attrs={
++                            qn("w:id"): str(rev_id),
++                            qn("w:author"): author,
++                            qn("w:date"): now,
++                        },
++                    )
++                    del_r = OxmlElement("w:r")
++                    del_text = OxmlElement("w:delText")
++                    del_text.text = search_text
++                    del_r.append(del_text)
++                    del_elem.append(del_r)
++                    parent.insert(insert_idx, del_elem)
++                    insert_idx += 1
++
++                    comment_id = None
++                    if comment:
++                        doc_comments = self.part._document_part.comments  # pyright: ignore[reportAttributeAccessIssue]
++                        comment_obj = doc_comments.add_comment(text=comment, author=author)
++                        comment_id = comment_obj.comment_id
++
++                        comment_start = OxmlElement(
++                            "w:commentRangeStart", attrs={qn("w:id"): str(comment_id)}
++                        )
++                        parent.insert(insert_idx, comment_start)
++                        insert_idx += 1
++
++                    rev_id = self._next_revision_id()
++                    ins_elem = OxmlElement(
++                        "w:ins",
++                        attrs={
++                            qn("w:id"): str(rev_id),
++                            qn("w:author"): author,
++                            qn("w:date"): now,
++                        },
++                    )
++                    ins_r = OxmlElement("w:r")
++                    ins_t = OxmlElement("w:t")
++                    ins_t.text = replace_text
++                    ins_r.append(ins_t)
++                    ins_elem.append(ins_r)
++                    parent.insert(insert_idx, ins_elem)
++                    insert_idx += 1
++
++                    if comment_id is not None:
++                        comment_end = OxmlElement(
++                            "w:commentRangeEnd", attrs={qn("w:id"): str(comment_id)}
++                        )
++                        parent.insert(insert_idx, comment_end)
++                        insert_idx += 1
++
++                        comment_ref_run = cast(CT_R, OxmlElement("w:r"))
++                        comment_ref_rPr = comment_ref_run.get_or_add_rPr()
++                        comment_ref_rPr.style = "CommentReference"
++                        comment_ref_run.append(
++                            OxmlElement("w:commentReference", attrs={qn("w:id"): str(comment_id)})
++                        )
++                        parent.insert(insert_idx, comment_ref_run)
++                        insert_idx += 1
++
++                    count += 1
++
++        return count
++
+     def _insert_paragraph_before(self):
+         """Return a newly created paragraph, inserted directly before this paragraph."""
+         p = self._p.add_p_before()
+diff --git a/src/docx/text/run.py b/src/docx/text/run.py
+index 57ea31f..16c07c4 100644
+--- a/src/docx/text/run.py
++++ b/src/docx/text/run.py
+@@ -2,13 +2,17 @@
+ 
+ from __future__ import annotations
+ 
++import datetime as dt
+ from typing import IO, TYPE_CHECKING, Iterator, cast
+ 
+ from docx.drawing import Drawing
+ from docx.enum.style import WD_STYLE_TYPE
+ from docx.enum.text import WD_BREAK
+ from docx.oxml.drawing import CT_Drawing
++from docx.oxml.ns import qn
++from docx.oxml.parser import OxmlElement
+ from docx.oxml.text.pagebreak import CT_LastRenderedPageBreak
++from docx.revision import TrackedDeletion
+ from docx.shape import InlineShape
+ from docx.shared import StoryChild
+ from docx.styles.style import CharacterStyle
+@@ -117,6 +121,156 @@ class Run(StoryChild):
+         self._r.clear_content()
+         return self
+ 
++    def delete_tracked(self, author: str = "", revision_id: int | None = None) -> TrackedDeletion:
++        """Mark this run as deleted with track changes.
++
++        Instead of removing the run, it is wrapped in a `w:del` element to mark it
++        as deleted content when track changes is enabled. The run remains in the
++        document but is displayed as deleted text (e.g., with strikethrough).
++
++        Args:
++            author: Author name for the revision. Defaults to empty string.
++            revision_id: Unique ID for this revision. Auto-generated if not provided.
++
++        Returns:
++            A TrackedDeletion object wrapping the `w:del` element.
++        """
++        if revision_id is None:
++            revision_id = self._next_revision_id()
++
++        parent = self._r.getparent()
++        if parent is None:
++            raise ValueError("Run has no parent element")
++
++        del_elem = OxmlElement(
++            "w:del",
++            attrs={
++                qn("w:id"): str(revision_id),
++                qn("w:author"): author,
++                qn("w:date"): dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
++            },
++        )
++
++        for t_elem in self._r.findall(qn("w:t")):
++            delText = OxmlElement("w:delText")
++            delText.text = t_elem.text
++            if t_elem.get(qn("xml:space")) == "preserve":
++                delText.set(qn("xml:space"), "preserve")
++            t_elem.getparent().replace(t_elem, delText)  # pyright: ignore[reportOptionalMemberAccess]
++
++        index = list(parent).index(self._r)
++        parent.insert(index, del_elem)
++        del_elem.append(self._r)
++
++        return TrackedDeletion(del_elem, self._parent)  # pyright: ignore[reportArgumentType]
++
++    def replace_tracked_at(
++        self,
++        start: int,
++        end: int,
++        replace_text: str,
++        author: str = "",
++    ) -> None:
++        """Replace text at character offsets `start` to `end` using track changes.
++
++        Creates a tracked deletion of the text at positions [start, end) and a tracked
++        insertion of `replace_text` at that position.
++
++        Args:
++            start: Starting character offset (0-based, inclusive).
++            end: Ending character offset (0-based, exclusive).
++            replace_text: Text to insert in place of the deleted text.
++            author: Author name for the revision. Defaults to empty string.
++
++        Raises:
++            ValueError: If start or end are out of bounds or start >= end.
++        """
++        text = self.text
++        if start < 0 or end > len(text) or start >= end:
++            raise ValueError(
++                f"Invalid offsets: start={start}, end={end} for text of length {len(text)}"
++            )
++
++        now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
++        deleted_text = text[start:end]
++        before_text = text[:start]
++        after_text = text[end:]
++
++        r_elem = self._r
++        parent = r_elem.getparent()
++        if parent is None:
++            raise ValueError("Run has no parent element")
++
++        index = list(parent).index(r_elem)
++        parent.remove(r_elem)
++
++        insert_idx = index
++
++        if before_text:
++            before_r = OxmlElement("w:r")
++            before_t = OxmlElement("w:t")
++            before_t.text = before_text
++            if before_text.startswith(" ") or before_text.endswith(" "):
++                before_t.set(qn("xml:space"), "preserve")
++            before_r.append(before_t)
++            parent.insert(insert_idx, before_r)
++            insert_idx += 1
++
++        rev_id = self._next_revision_id()
++        del_elem = OxmlElement(
++            "w:del",
++            attrs={
++                qn("w:id"): str(rev_id),
++                qn("w:author"): author,
++                qn("w:date"): now,
++            },
++        )
++        del_r = OxmlElement("w:r")
++        del_text_elem = OxmlElement("w:delText")
++        del_text_elem.text = deleted_text
++        del_r.append(del_text_elem)
++        del_elem.append(del_r)
++        parent.insert(insert_idx, del_elem)
++        insert_idx += 1
++
++        rev_id = self._next_revision_id()
++        ins_elem = OxmlElement(
++            "w:ins",
++            attrs={
++                qn("w:id"): str(rev_id),
++                qn("w:author"): author,
++                qn("w:date"): now,
++            },
++        )
++        ins_r = OxmlElement("w:r")
++        ins_t = OxmlElement("w:t")
++        ins_t.text = replace_text
++        ins_r.append(ins_t)
++        ins_elem.append(ins_r)
++        parent.insert(insert_idx, ins_elem)
++        insert_idx += 1
++
++        if after_text:
++            after_r = OxmlElement("w:r")
++            after_t = OxmlElement("w:t")
++            after_t.text = after_text
++            if after_text.startswith(" ") or after_text.endswith(" "):
++                after_t.set(qn("xml:space"), "preserve")
++            after_r.append(after_t)
++            parent.insert(insert_idx, after_r)
++
++    def _next_revision_id(self) -> int:
++        """Generate the next unique revision ID for this document."""
++        max_id = 0
++        for ins_or_del in self._r.xpath("//w:ins | //w:del"):
++            id_val = ins_or_del.get(qn("w:id"))  # pyright: ignore[reportUnknownMemberType]
++            if id_val is not None:
++                try:
++                    max_id = max(max_id, int(id_val))
++                except ValueError:
++                    pass
++        return max_id + 1
++
+     @property
+     def contains_page_break(self) -> bool:
+         """`True` when one or more rendered page-breaks occur in this run.
+diff --git a/tests/test_revision.py b/tests/test_revision.py
+new file mode 100644
+index 0000000..522672d
+--- /dev/null
++++ b/tests/test_revision.py
+@@ -0,0 +1,589 @@
++# pyright: reportPrivateUsage=false
++# pyright: reportUnknownMemberType=false
++
++"""Unit test suite for the docx.revision module."""
++
++from __future__ import annotations
++
++import datetime as dt
++from typing import cast
++
++import pytest
++
++from docx.oxml.ns import qn
++from docx.oxml.revision import CT_RunTrackChange, CT_TrackChange
++from docx.revision import TrackedChange, TrackedDeletion, TrackedInsertion
++from docx.table import Table
++from docx.text.paragraph import Paragraph
++from docx.text.run import Run
++
++from .unitutil.cxml import element, xml
++from .unitutil.mock import FixtureRequest, Mock, instance_mock, property_mock
++
++
++class DescribeCT_TrackChange:
++    """Unit-test suite for `docx.oxml.revision.CT_TrackChange`."""
++
++    def it_provides_access_to_the_id_attribute(self):
++        ins = cast(CT_TrackChange, element("w:ins{w:id=42,w:author=John}"))
++        assert ins.id == 42
++
++    def it_can_set_the_id_attribute(self):
++        ins = cast(CT_TrackChange, element("w:ins{w:id=1,w:author=John}"))
++        ins.id = 99
++        assert ins.id == 99
++
++    def it_provides_access_to_the_author_attribute(self):
++        ins = cast(CT_TrackChange, element("w:ins{w:id=1,w:author=Jane Doe}"))
++        assert ins.author == "Jane Doe"
++
++    def it_can_set_the_author_attribute(self):
++        ins = cast(CT_TrackChange, element("w:ins{w:id=1,w:author=John}"))
++        ins.author = "Jane Doe"
++        assert ins.author == "Jane Doe"
++
++    def it_provides_access_to_the_date_attribute(self):
++        ins = cast(
++            CT_TrackChange,
++            element("w:ins{w:id=1,w:author=John,w:date=2024-01-15T10:30:00Z}"),
++        )
++        assert ins.date == "2024-01-15T10:30:00Z"
++
++    def it_returns_None_when_date_attribute_is_not_present(self):
++        ins = cast(CT_TrackChange, element("w:ins{w:id=1,w:author=John}"))
++        assert ins.date is None
++
++    def it_provides_date_value_as_datetime(self):
++        ins = cast(
++            CT_TrackChange,
++            element("w:ins{w:id=1,w:author=John,w:date=2024-01-15T10:30:00Z}"),
++        )
++        date_val = ins.date_value
++        assert date_val is not None
++        assert date_val.year == 2024
++        assert date_val.month == 1
++        assert date_val.day == 15
++        assert date_val.hour == 10
++        assert date_val.minute == 30
++
++    def it_returns_None_for_date_value_when_date_not_set(self):
++        ins = cast(CT_TrackChange, element("w:ins{w:id=1,w:author=John}"))
++        assert ins.date_value is None
++
++    def it_can_set_date_value_from_datetime(self):
++        ins = cast(CT_TrackChange, element("w:ins{w:id=1,w:author=John}"))
++        ins.date_value = dt.datetime(2024, 6, 15, 14, 30, 0, tzinfo=dt.timezone.utc)
++        assert ins.date == "2024-06-15T14:30:00Z"
++
++    def it_can_clear_date_value_by_setting_None(self):
++        ins = cast(
++            CT_TrackChange,
++            element("w:ins{w:id=1,w:author=John,w:date=2024-01-15T10:30:00Z}"),
++        )
++        ins.date_value = None
++        assert ins.date is None
++
++
++class DescribeCT_RunTrackChange:
++    """Unit-test suite for `docx.oxml.revision.CT_RunTrackChange`."""
++
++    def it_provides_access_to_paragraph_elements(self):
++        ins = cast(CT_RunTrackChange, element("w:ins{w:id=1,w:author=John}/(w:p,w:p)"))
++        assert len(ins.p_lst) == 2
++
++    def it_provides_access_to_run_elements(self):
++        ins = cast(CT_RunTrackChange, element("w:ins{w:id=1,w:author=John}/(w:r,w:r,w:r)"))
++        assert len(ins.r_lst) == 3
++
++    def it_provides_inner_content_elements_for_block_level_content(self):
++        ins = cast(CT_RunTrackChange, element("w:ins{w:id=1,w:author=John}/(w:p,w:tbl,w:p)"))
++        elements = ins.inner_content_elements
++        assert len(elements) == 3
++        assert elements[0].tag == qn("w:p")
++        assert elements[1].tag == qn("w:tbl")
++        assert elements[2].tag == qn("w:p")
++
++    def it_provides_run_content_elements_for_run_level_content(self):
++        ins = cast(CT_RunTrackChange, element("w:ins{w:id=1,w:author=John}/(w:r,w:r)"))
++        elements = ins.run_content_elements
++        assert len(elements) == 2
++        assert elements[0].tag == qn("w:r")
++        assert elements[1].tag == qn("w:r")
++
++
++class DescribeTrackedInsertion:
++    """Unit-test suite for `docx.revision.TrackedInsertion`."""
++
++    def it_provides_access_to_author(self, parent_: Mock):
++        ins_elm = cast(CT_RunTrackChange, element("w:ins{w:id=1,w:author=Alice}"))
++        tracked = TrackedInsertion(ins_elm, parent_)
++        assert tracked.author == "Alice"
++
++    def it_can_set_author(self, parent_: Mock):
++        ins_elm = cast(CT_RunTrackChange, element("w:ins{w:id=1,w:author=Alice}"))
++        tracked = TrackedInsertion(ins_elm, parent_)
++        tracked.author = "Bob"
++        assert tracked.author == "Bob"
++
++    def it_provides_access_to_revision_id(self, parent_: Mock):
++        ins_elm = cast(CT_RunTrackChange, element("w:ins{w:id=42,w:author=Alice}"))
++        tracked = TrackedInsertion(ins_elm, parent_)
++        assert tracked.revision_id == 42
++
++    def it_can_set_revision_id(self, parent_: Mock):
++        ins_elm = cast(CT_RunTrackChange, element("w:ins{w:id=1,w:author=Alice}"))
++        tracked = TrackedInsertion(ins_elm, parent_)
++        tracked.revision_id = 99
++        assert tracked.revision_id == 99
++
++    def it_provides_access_to_date(self, parent_: Mock):
++        ins_elm = cast(
++            CT_RunTrackChange,
++            element("w:ins{w:id=1,w:author=Alice,w:date=2024-03-15T08:00:00Z}"),
++        )
++        tracked = TrackedInsertion(ins_elm, parent_)
++        date_val = tracked.date
++        assert date_val is not None
++        assert date_val.year == 2024
++        assert date_val.month == 3
++
++    def it_detects_block_level_content(self, parent_: Mock):
++        ins_elm = cast(CT_RunTrackChange, element("w:ins{w:id=1,w:author=Alice}/w:p"))
++        tracked = TrackedInsertion(ins_elm, parent_)
++        assert tracked.is_block_level is True
++        assert tracked.is_run_level is False
++
++    def it_detects_run_level_content(self, parent_: Mock):
++        ins_elm = cast(CT_RunTrackChange, element("w:ins{w:id=1,w:author=Alice}/w:r"))
++        tracked = TrackedInsertion(ins_elm, parent_)
++        assert tracked.is_block_level is False
++        assert tracked.is_run_level is True
++
++    def it_provides_access_to_runs(self, parent_: Mock):
++        ins_elm = cast(
++            CT_RunTrackChange,
++            element("w:ins{w:id=1,w:author=Alice}/(w:r/w:t{xml:space=preserve}\"Hello\",w:r/w:t{xml:space=preserve}\" World\")"),
++        )
++        tracked = TrackedInsertion(ins_elm, parent_)
++        runs = tracked.runs
++        assert len(runs) == 2
++        assert all(isinstance(r, Run) for r in runs)
++
++    def it_provides_text_for_run_level_insertion(self, parent_: Mock):
++        ins_elm = cast(
++            CT_RunTrackChange,
++            element("w:ins{w:id=1,w:author=Alice}/(w:r/w:t{xml:space=preserve}\"Hello\",w:r/w:t{xml:space=preserve}\" World\")"),
++        )
++        tracked = TrackedInsertion(ins_elm, parent_)
++        assert tracked.text == "Hello World"
++
++    def it_can_accept_insertion(self, parent_: Mock):
++        body = element("w:body/(w:p,w:ins{w:id=1,w:author=Alice}/w:r/w:t\"inserted\",w:p)")
++        ins_elm = cast(CT_RunTrackChange, body[1])
++        tracked = TrackedInsertion(ins_elm, parent_)
++
++        tracked.accept()
++
++        assert body.xml == xml("w:body/(w:p,w:r/w:t\"inserted\",w:p)")
++
++    def it_can_reject_insertion(self, parent_: Mock):
++        body = element("w:body/(w:p,w:ins{w:id=1,w:author=Alice}/w:r/w:t\"inserted\",w:p)")
++        ins_elm = cast(CT_RunTrackChange, body[1])
++        tracked = TrackedInsertion(ins_elm, parent_)
++
++        tracked.reject()
++
++        assert body.xml == xml("w:body/(w:p,w:p)")
++
++    @pytest.fixture
++    def parent_(self, request: FixtureRequest):
++        return instance_mock(request, Paragraph)
++
++
++class DescribeTrackedDeletion:
++    """Unit-test suite for `docx.revision.TrackedDeletion`."""
++
++    def it_provides_access_to_author(self, parent_: Mock):
++        del_elm = cast(CT_RunTrackChange, element("w:del{w:id=1,w:author=Bob}"))
++        tracked = TrackedDeletion(del_elm, parent_)
++        assert tracked.author == "Bob"
++
++    def it_provides_access_to_revision_id(self, parent_: Mock):
++        del_elm = cast(CT_RunTrackChange, element("w:del{w:id=55,w:author=Bob}"))
++        tracked = TrackedDeletion(del_elm, parent_)
++        assert tracked.revision_id == 55
++
++    def it_detects_run_level_content(self, parent_: Mock):
++        del_elm = cast(CT_RunTrackChange, element("w:del{w:id=1,w:author=Bob}/w:r"))
++        tracked = TrackedDeletion(del_elm, parent_)
++        assert tracked.is_run_level is True
++        assert tracked.is_block_level is False
++
++    def it_provides_text_for_run_level_deletion(self, parent_: Mock):
++        del_elm = cast(
++            CT_RunTrackChange,
++            element("w:del{w:id=1,w:author=Bob}/w:r/w:t\"deleted text\""),
++        )
++        tracked = TrackedDeletion(del_elm, parent_)
++        assert tracked.text == "deleted text"
++
++    def it_can_accept_deletion(self, parent_: Mock):
++        body = element("w:body/(w:p,w:del{w:id=1,w:author=Bob}/w:r/w:t\"deleted\",w:p)")
++        del_elm = cast(CT_RunTrackChange, body[1])
++        tracked = TrackedDeletion(del_elm, parent_)
++
++        tracked.accept()
++
++        assert body.xml == xml("w:body/(w:p,w:p)")
++
++    def it_can_reject_deletion(self, parent_: Mock):
++        body = element("w:body/(w:p,w:del{w:id=1,w:author=Bob}/w:r/w:t\"deleted\",w:p)")
++        del_elm = cast(CT_RunTrackChange, body[1])
++        tracked = TrackedDeletion(del_elm, parent_)
++
++        tracked.reject()
++
++        assert body.xml == xml("w:body/(w:p,w:r/w:t\"deleted\",w:p)")
++
++    @pytest.fixture
++    def parent_(self, request: FixtureRequest):
++        return instance_mock(request, Paragraph)
++
++
++class DescribeParagraph_iter_inner_content_with_revisions:
++    """Unit-test suite for `Paragraph.iter_inner_content` with include_revisions=True."""
++
++    def it_yields_tracked_insertions_when_include_revisions_is_True(
++        self, document_part_: Mock
++    ):
++        p = element("w:p/(w:r/w:t\"normal\",w:ins{w:id=1,w:author=Alice}/w:r/w:t\"inserted\")")
++        paragraph = Paragraph(p, document_part_)
++
++        items = list(paragraph.iter_inner_content(include_revisions=True))
++
++        assert len(items) == 2
++        assert isinstance(items[0], Run)
++        assert isinstance(items[1], TrackedInsertion)
++
++    def it_yields_tracked_deletions_when_include_revisions_is_True(
++        self, document_part_: Mock
++    ):
++        p = element("w:p/(w:r/w:t\"normal\",w:del{w:id=1,w:author=Bob}/w:r/w:t\"deleted\")")
++        paragraph = Paragraph(p, document_part_)
++
++        items = list(paragraph.iter_inner_content(include_revisions=True))
++
++        assert len(items) == 2
++        assert isinstance(items[0], Run)
++        assert isinstance(items[1], TrackedDeletion)
++
++    def it_excludes_revisions_by_default(self, document_part_: Mock):
++        p = element("w:p/(w:r/w:t\"normal\",w:ins{w:id=1,w:author=Alice}/w:r/w:t\"inserted\")")
++        paragraph = Paragraph(p, document_part_)
++
++        items = list(paragraph.iter_inner_content())
++
++        assert len(items) == 1
++        assert isinstance(items[0], Run)
++
++    @pytest.fixture
++    def document_part_(self, request: FixtureRequest):
++        from docx.parts.document import DocumentPart
++
++        return instance_mock(request, DocumentPart)
++
++
++class DescribeParagraph_add_run_tracked:
++    """Unit-test suite for `Paragraph.add_run_tracked`."""
++
++    def it_adds_a_tracked_insertion_with_text(self, document_part_: Mock):
++        p = element("w:p")
++        paragraph = Paragraph(p, document_part_)
++
++        tracked = paragraph.add_run_tracked(text="new text", author="TestAuthor", revision_id=1)
++
++        assert isinstance(tracked, TrackedInsertion)
++        assert tracked.author == "TestAuthor"
++        assert tracked.revision_id == 1
++        ins_elements = p.xpath("./w:ins")
++        assert len(ins_elements) == 1
++
++    def it_auto_generates_revision_id_when_not_provided(self, document_part_: Mock):
++        p = element("w:p/w:ins{w:id=5,w:author=Other}/w:r")
++        paragraph = Paragraph(p, document_part_)
++
++        tracked = paragraph.add_run_tracked(text="new", author="TestAuthor")
++
++        assert tracked.revision_id == 6
++
++    @pytest.fixture
++    def document_part_(self, request: FixtureRequest):
++        from docx.parts.document import DocumentPart
++
++        return instance_mock(request, DocumentPart)
++
++
++class DescribeRun_delete_tracked:
++    """Unit-test suite for `Run.delete_tracked`."""
++
++    def it_wraps_run_in_del_element(self, document_part_: Mock):
++        p = element("w:p/w:r/w:t\"to delete\"")
++        r = p[0]
++        run = Run(r, document_part_)
++
++        tracked = run.delete_tracked(author="Deleter", revision_id=10)
++
++        assert isinstance(tracked, TrackedDeletion)
++        assert tracked.author == "Deleter"
++        assert tracked.revision_id == 10
++        del_elements = p.xpath("./w:del")
++        assert len(del_elements) == 1
++        assert del_elements[0][0].tag == qn("w:r")
++
++    def it_converts_w_t_to_w_delText(self, document_part_: Mock):
++        p = element("w:p/w:r/w:t\"deleted text\"")
++        r = p[0]
++        run = Run(r, document_part_)
++
++        run.delete_tracked(author="Deleter", revision_id=1)
++
++        del_elem = p.xpath("./w:del")[0]
++        r_elem = del_elem[0]
++        t_elements = r_elem.xpath("./w:t")
++        delText_elements = r_elem.xpath("./w:delText")
++        assert len(t_elements) == 0
++        assert len(delText_elements) == 1
++        assert delText_elements[0].text == "deleted text"
++
++    def it_auto_generates_revision_id_when_not_provided(self, document_part_: Mock):
++        body = element("w:body/(w:del{w:id=7,w:author=Other}/w:r,w:p/w:r/w:t\"text\")")
++        p = body[1]
++        r = p[0]
++        run = Run(r, document_part_)
++
++        tracked = run.delete_tracked(author="Deleter")
++
++        assert tracked.revision_id == 8
++
++    @pytest.fixture
++    def document_part_(self, request: FixtureRequest):
++        from docx.parts.document import DocumentPart
++
++        return instance_mock(request, DocumentPart)
++
++
++class DescribeRun_replace_tracked_at:
++    """Unit-test suite for `Run.replace_tracked_at`."""
++
++    def it_replaces_text_at_specified_offsets(self, document_part_: Mock):
++        p = element("w:p/w:r/w:t\"Hello World\"")
++        r = p[0]
++        run = Run(r, document_part_)
++
++        run.replace_tracked_at(start=6, end=11, replace_text="Universe", author="Tester")
++
++        del_elements = p.xpath(".//w:del")
++        ins_elements = p.xpath(".//w:ins")
++        assert len(del_elements) == 1
++        assert len(ins_elements) == 1
++        del_text = del_elements[0].xpath(".//w:delText")[0]
++        ins_text = ins_elements[0].xpath(".//w:t")[0]
++        assert del_text.text == "World"
++        assert ins_text.text == "Universe"
++
++    def it_preserves_text_before_replacement(self, document_part_: Mock):
++        p = element("w:p/w:r/w:t\"Hello World\"")
++        r = p[0]
++        run = Run(r, document_part_)
++
++        run.replace_tracked_at(start=6, end=11, replace_text="Universe", author="Tester")
++
++        before_runs = p.xpath("./w:r/w:t[text()='Hello ']")
++        assert len(before_runs) == 1
++
++    def it_preserves_text_after_replacement(self, document_part_: Mock):
++        p = element("w:p/w:r/w:t\"Hello World!\"")
++        r = p[0]
++        run = Run(r, document_part_)
++
++        run.replace_tracked_at(start=6, end=11, replace_text="Universe", author="Tester")
++
++        after_runs = p.xpath("./w:r/w:t[text()='!']")
++        assert len(after_runs) == 1
++
++    def it_handles_replacement_at_start_of_run(self, document_part_: Mock):
++        p = element("w:p/w:r/w:t\"Hello World\"")
++        r = p[0]
++        run = Run(r, document_part_)
++
++        run.replace_tracked_at(start=0, end=5, replace_text="Hi", author="Tester")
++
++        del_text = p.xpath(".//w:delText")[0]
++        ins_text = p.xpath(".//w:ins//w:t")[0]
++        assert del_text.text == "Hello"
++        assert ins_text.text == "Hi"
++
++    def it_handles_replacement_at_end_of_run(self, document_part_: Mock):
++        p = element("w:p/w:r/w:t\"Hello World\"")
++        r = p[0]
++        run = Run(r, document_part_)
++
++        run.replace_tracked_at(start=6, end=11, replace_text="Everyone", author="Tester")
++
++        del_text = p.xpath(".//w:delText")[0]
++        ins_text = p.xpath(".//w:ins//w:t")[0]
++        assert del_text.text == "World"
++        assert ins_text.text == "Everyone"
++
++    def it_raises_on_invalid_offsets(self, document_part_: Mock):
++        p = element("w:p/w:r/w:t\"Hello\"")
++        r = p[0]
++        run = Run(r, document_part_)
++
++        with pytest.raises(ValueError, match="Invalid offsets"):
++            run.replace_tracked_at(start=10, end=15, replace_text="test", author="Tester")
++
++    def it_raises_when_start_equals_end(self, document_part_: Mock):
++        p = element("w:p/w:r/w:t\"Hello\"")
++        r = p[0]
++        run = Run(r, document_part_)
++
++        with pytest.raises(ValueError, match="Invalid offsets"):
++            run.replace_tracked_at(start=3, end=3, replace_text="test", author="Tester")
++
++    def it_raises_when_start_greater_than_end(self, document_part_: Mock):
++        p = element("w:p/w:r/w:t\"Hello\"")
++        r = p[0]
++        run = Run(r, document_part_)
++
++        with pytest.raises(ValueError, match="Invalid offsets"):
++            run.replace_tracked_at(start=4, end=2, replace_text="test", author="Tester")
++
++    @pytest.fixture
++    def document_part_(self, request: FixtureRequest):
++        from docx.parts.document import DocumentPart
++
++        return instance_mock(request, DocumentPart)
++
++
++class DescribeParagraph_replace_tracked_at:
++    """Unit-test suite for `Paragraph.replace_tracked_at`."""
++
++    def it_replaces_text_within_single_run(self, document_part_: Mock):
++        p = element("w:p/w:r/w:t\"Hello World\"")
++        paragraph = Paragraph(p, document_part_)
++
++        paragraph.replace_tracked_at(start=6, end=11, replace_text="Universe", author="Tester")
++
++        del_elements = p.xpath(".//w:del")
++        ins_elements = p.xpath(".//w:ins")
++        assert len(del_elements) == 1
++        assert len(ins_elements) == 1
++        del_text = del_elements[0].xpath(".//w:delText")[0]
++        ins_text = ins_elements[0].xpath(".//w:t")[0]
++        assert del_text.text == "World"
++        assert ins_text.text == "Universe"
++
++    def it_replaces_text_spanning_multiple_runs(self, document_part_: Mock):
++        p = element("w:p/(w:r/w:t\"Hello \",w:r/w:t\"World\")")
++        paragraph = Paragraph(p, document_part_)
++
++        paragraph.replace_tracked_at(start=4, end=9, replace_text="X", author="Tester")
++
++        del_elements = p.xpath(".//w:del")
++        ins_elements = p.xpath(".//w:ins")
++        assert len(del_elements) == 1
++        assert len(ins_elements) == 1
++        del_text = del_elements[0].xpath(".//w:delText")[0]
++        ins_text = ins_elements[0].xpath(".//w:t")[0]
++        assert del_text.text == "o Wor"
++        assert ins_text.text == "X"
++
++    def it_preserves_text_before_and_after_multi_run_replacement(self, document_part_: Mock):
++        p = element("w:p/(w:r/w:t\"Hello \",w:r/w:t\"World\")")
++        paragraph = Paragraph(p, document_part_)
++
++        paragraph.replace_tracked_at(start=4, end=9, replace_text="X", author="Tester")
++
++        before_runs = p.xpath("./w:r/w:t[text()='Hell']")
++        after_runs = p.xpath("./w:r/w:t[text()='ld']")
++        assert len(before_runs) == 1
++        assert len(after_runs) == 1
++
++    def it_raises_on_invalid_offsets(self, document_part_: Mock):
++        p = element("w:p/w:r/w:t\"Hello\"")
++        paragraph = Paragraph(p, document_part_)
++
++        with pytest.raises(ValueError, match="Invalid offsets"):
++            paragraph.replace_tracked_at(start=10, end=15, replace_text="test", author="Tester")
++
++    def it_raises_on_empty_paragraph(self, document_part_: Mock):
++        p = element("w:p")
++        paragraph = Paragraph(p, document_part_)
++
++        with pytest.raises(ValueError, match="Invalid offsets"):
++            paragraph.replace_tracked_at(start=0, end=5, replace_text="test", author="Tester")
++
++    @pytest.fixture
++    def document_part_(self, request: FixtureRequest):
++        from docx.parts.document import DocumentPart
++
++        return instance_mock(request, DocumentPart)
++
++
++class DescribeParagraph_replace_tracked:
++    """Unit-test suite for `Paragraph.replace_tracked`."""
++
++    def it_replaces_text_at_word_level(self, document_part_: Mock):
++        p = element("w:p/w:r/w:t\"Hello Unisys World\"")
++        paragraph = Paragraph(p, document_part_)
++
++        count = paragraph.replace_tracked("Unisys", "test", author="Tester")
++
++        assert count == 1
++        del_elements = p.xpath(".//w:del")
++        ins_elements = p.xpath(".//w:ins")
++        assert len(del_elements) == 1
++        assert len(ins_elements) == 1
++        del_text = del_elements[0].xpath(".//w:delText")[0]
++        ins_text = ins_elements[0].xpath(".//w:t")[0]
++        assert del_text.text == "Unisys"
++        assert ins_text.text == "test"
++
++    def it_handles_multiple_occurrences_in_same_run(self, document_part_: Mock):
++        p = element("w:p/w:r/w:t\"Unisys and Unisys again\"")
++        paragraph = Paragraph(p, document_part_)
++
++        count = paragraph.replace_tracked("Unisys", "test", author="Tester")
++
++        assert count == 2
++        del_elements = p.xpath(".//w:del")
++        ins_elements = p.xpath(".//w:ins")
++        assert len(del_elements) == 2
++        assert len(ins_elements) == 2
++
++    def it_preserves_surrounding_text(self, document_part_: Mock):
++        p = element("w:p/w:r/w:t\"Before Unisys After\"")
++        paragraph = Paragraph(p, document_part_)
++
++        paragraph.replace_tracked("Unisys", "test", author="Tester")
++
++        all_text = "".join(t.text or "" for t in p.xpath(".//w:t | .//w:delText"))
++        assert "Before" in all_text
++        assert "After" in all_text
++        assert "Unisys" in all_text
++        assert "test" in all_text
++
++    def it_returns_zero_when_no_match(self, document_part_: Mock):
++        p = element("w:p/w:r/w:t\"No match here\"")
++        paragraph = Paragraph(p, document_part_)
++
++        count = paragraph.replace_tracked("Unisys", "test", author="Tester")
++
++        assert count == 0
++
++    @pytest.fixture
++    def document_part_(self, request: FixtureRequest):
++        from docx.parts.document import DocumentPart
++
++        return instance_mock(request, DocumentPart)
+diff --git a/tests/unitutil/cxml.py b/tests/unitutil/cxml.py
+index e76cabd..61ed242 100644
+--- a/tests/unitutil/cxml.py
++++ b/tests/unitutil/cxml.py
+@@ -6,6 +6,7 @@ element trees suitable for unit testing.
+ 
+ from pyparsing import (
+     Combine,
++    DelimitedList,
+     Forward,
+     Group,
+     Literal,
+@@ -15,7 +16,6 @@ from pyparsing import (
+     alphanums,
+     alphas,
+     dblQuotedString,
+-    delimitedList,
+     removeQuotes,
+     stringEnd,
+ )
+@@ -36,7 +36,7 @@ def element(cxel_str: str):
+ 
+ def xml(cxel_str: str) -> str:
+     """Return the XML generated from `cxel_str`."""
+-    root_token = root_node.parseString(cxel_str)
++    root_token = root_node.parse_string(cxel_str)
+     xml = root_token.element.xml
+     return xml
+ 
+@@ -243,28 +243,28 @@ def grammar():
+     attr_name = Word(alphas + ":")
+     attr_val = Word(alphanums + " %-./:_")
+     attr_def = Group(attr_name + equal + attr_val)
+-    attr_list = open_brace + delimitedList(attr_def) + close_brace
++    attr_list = open_brace + DelimitedList(attr_def) + close_brace
+ 
+-    text = dblQuotedString.setParseAction(removeQuotes)
++    text = dblQuotedString.set_parse_action(removeQuotes)
+ 
+     # w:jc{val=right} ----------------------------
+     element = (
+         tagname("tagname")
+         + Group(Optional(attr_list))("attr_list")
+         + Optional(text, default="")("text")
+-    ).setParseAction(Element.from_token)
++    ).set_parse_action(Element.from_token)
+ 
+     child_node_list = Forward()
+ 
+     node = Group(
+         element("element") + Group(Optional(slash + child_node_list))("child_node_list")
+-    ).setParseAction(connect_node_children)
++    ).set_parse_action(connect_node_children)
+ 
+-    child_node_list << (open_paren + delimitedList(node) + close_paren | node)
++    child_node_list <<= (open_paren + DelimitedList(node) + close_paren | node)
+ 
+     root_node = (
+         element("element") + Group(Optional(slash + child_node_list))("child_node_list") + stringEnd
+-    ).setParseAction(connect_root_node_children)
++    ).set_parse_action(connect_root_node_children)
+ 
+     return root_node
+ 

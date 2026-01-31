@@ -76,6 +76,8 @@ split-on-trailing-comma = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+python_classes = ["Describe*", "Test*"]
+python_functions = ["it_*", "test_*"]
 
 [build-system]
 requires = ["hatchling"]
