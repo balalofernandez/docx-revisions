@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/balalofernandez/docx-revisions/compare/docx-revisions-v0.1.2...docx-revisions-v0.1.3) (2026-01-31)
+
+
+### Documentation
+
+* Add ai example ([#4](https://github.com/balalofernandez/docx-revisions/issues/4)) ([521f226](https://github.com/balalofernandez/docx-revisions/commit/521f22678861efb4566e517633005746d5dc4d36))
+
 ## [0.1.2](https://github.com/balalofernandez/docx-revisions/compare/docx-revisions-v0.1.1...docx-revisions-v0.1.2) (2026-01-31)
 
 
