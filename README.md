@@ -65,4 +65,4 @@ rp.add_tracked_insertion("new text", author="Editor")
 rp.add_tracked_deletion(start=5, end=10, author="Editor")
 ```
 
-## [Documentation](https://balalofernandez.github.io/docx-revisions)
+
