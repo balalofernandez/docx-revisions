@@ -20,6 +20,10 @@ pip install docx-revisions
 
 ## Quick Start
 
+### Check out our examples!
+
+Navigate to the [examples directory](https://github.com/balalofernandez/docx-revisions/tree/main/examples) to see code samples.
+
 ### Read tracked changes
 
 ```python
@@ -64,5 +68,3 @@ rp = RevisionParagraph.from_paragraph(paragraph)
 rp.add_tracked_insertion("new text", author="Editor")
 rp.add_tracked_deletion(start=5, end=10, author="Editor")
 ```
-
-

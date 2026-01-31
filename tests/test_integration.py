@@ -1,6 +1,6 @@
 """Integration tests — round-trip and real docx file tests."""
 
-from __future__ import annotations
+
 
 from pathlib import Path
 

@@ -1,6 +1,6 @@
 """Unit tests for the OXML element classes in docx_revisions.oxml."""
 
-from __future__ import annotations
+
 
 import datetime as dt
 

@@ -1,6 +1,5 @@
 """Tests for accepting and rejecting tracked changes."""
 
-from __future__ import annotations
 
 from pathlib import Path
 
