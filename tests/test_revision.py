@@ -1,7 +1,5 @@
 """Unit tests for TrackedInsertion and TrackedDeletion proxy classes."""
 
-from __future__ import annotations
-
 from unittest.mock import MagicMock
 
 from docx.oxml.ns import qn
@@ -46,10 +44,7 @@ class DescribeTrackedInsertion:
         assert tracked.revision_id == 99
 
     def it_reads_date(self):
-        ins = parse_xml(
-            f'<w:ins {_NSMAP} w:id="1" w:author="Alice"'
-            f' w:date="2024-03-15T08:00:00Z"/>'
-        )
+        ins = parse_xml(f'<w:ins {_NSMAP} w:id="1" w:author="Alice" w:date="2024-03-15T08:00:00Z"/>')
         tracked = TrackedInsertion(ins, _make_parent())
         d = tracked.date
         assert d is not None
@@ -70,10 +65,7 @@ class DescribeTrackedInsertion:
 
     def it_provides_runs(self):
         ins = parse_xml(
-            f'<w:ins {_NSMAP} w:id="1" w:author="A">'
-            f"<w:r><w:t>Hello</w:t></w:r>"
-            f"<w:r><w:t> World</w:t></w:r>"
-            f"</w:ins>"
+            f'<w:ins {_NSMAP} w:id="1" w:author="A"><w:r><w:t>Hello</w:t></w:r><w:r><w:t> World</w:t></w:r></w:ins>'
         )
         tracked = TrackedInsertion(ins, _make_parent())
         runs = tracked.runs
@@ -81,21 +73,14 @@ class DescribeTrackedInsertion:
 
     def it_provides_text_for_run_level(self):
         ins = parse_xml(
-            f'<w:ins {_NSMAP} w:id="1" w:author="A">'
-            f"<w:r><w:t>Hello</w:t></w:r>"
-            f"<w:r><w:t> World</w:t></w:r>"
-            f"</w:ins>"
+            f'<w:ins {_NSMAP} w:id="1" w:author="A"><w:r><w:t>Hello</w:t></w:r><w:r><w:t> World</w:t></w:r></w:ins>'
         )
         tracked = TrackedInsertion(ins, _make_parent())
         assert tracked.text == "Hello World"
 
     def it_accepts_by_unwrapping(self):
         body = parse_xml(
-            f'<w:body {_NSMAP}>'
-            f"<w:p/>"
-            f'<w:ins w:id="1" w:author="A"><w:r><w:t>inserted</w:t></w:r></w:ins>'
-            f"<w:p/>"
-            f"</w:body>"
+            f'<w:body {_NSMAP}><w:p/><w:ins w:id="1" w:author="A"><w:r><w:t>inserted</w:t></w:r></w:ins><w:p/></w:body>'
         )
         ins_elm = body[1]
         tracked = TrackedInsertion(ins_elm, _make_parent())
@@ -108,11 +93,7 @@ class DescribeTrackedInsertion:
 
     def it_rejects_by_removing_entirely(self):
         body = parse_xml(
-            f'<w:body {_NSMAP}>'
-            f"<w:p/>"
-            f'<w:ins w:id="1" w:author="A"><w:r><w:t>inserted</w:t></w:r></w:ins>'
-            f"<w:p/>"
-            f"</w:body>"
+            f'<w:body {_NSMAP}><w:p/><w:ins w:id="1" w:author="A"><w:r><w:t>inserted</w:t></w:r></w:ins><w:p/></w:body>'
         )
         ins_elm = body[1]
         tracked = TrackedInsertion(ins_elm, _make_parent())
@@ -146,30 +127,18 @@ class DescribeTrackedDeletion:
         assert tracked.is_block_level is False
 
     def it_reads_text_from_delText(self):
-        d = parse_xml(
-            f'<w:del {_NSMAP} w:id="1" w:author="B">'
-            f"<w:r><w:delText>deleted text</w:delText></w:r>"
-            f"</w:del>"
-        )
+        d = parse_xml(f'<w:del {_NSMAP} w:id="1" w:author="B"><w:r><w:delText>deleted text</w:delText></w:r></w:del>')
         tracked = TrackedDeletion(d, _make_parent())
         assert tracked.text == "deleted text"
 
     def it_reads_text_from_w_t_as_fallback(self):
-        d = parse_xml(
-            f'<w:del {_NSMAP} w:id="1" w:author="B">'
-            f"<w:r><w:t>deleted via t</w:t></w:r>"
-            f"</w:del>"
-        )
+        d = parse_xml(f'<w:del {_NSMAP} w:id="1" w:author="B"><w:r><w:t>deleted via t</w:t></w:r></w:del>')
         tracked = TrackedDeletion(d, _make_parent())
         assert tracked.text == "deleted via t"
 
     def it_accepts_by_removing_entirely(self):
         body = parse_xml(
-            f'<w:body {_NSMAP}>'
-            f"<w:p/>"
-            f'<w:del w:id="1" w:author="B"><w:r><w:t>deleted</w:t></w:r></w:del>'
-            f"<w:p/>"
-            f"</w:body>"
+            f'<w:body {_NSMAP}><w:p/><w:del w:id="1" w:author="B"><w:r><w:t>deleted</w:t></w:r></w:del><w:p/></w:body>'
         )
         del_elm = body[1]
         tracked = TrackedDeletion(del_elm, _make_parent())
@@ -181,11 +150,7 @@ class DescribeTrackedDeletion:
 
     def it_rejects_by_unwrapping(self):
         body = parse_xml(
-            f'<w:body {_NSMAP}>'
-            f"<w:p/>"
-            f'<w:del w:id="1" w:author="B"><w:r><w:t>deleted</w:t></w:r></w:del>'
-            f"<w:p/>"
-            f"</w:body>"
+            f'<w:body {_NSMAP}><w:p/><w:del w:id="1" w:author="B"><w:r><w:t>deleted</w:t></w:r></w:del><w:p/></w:body>'
         )
         del_elm = body[1]
         tracked = TrackedDeletion(del_elm, _make_parent())
@@ -197,11 +162,7 @@ class DescribeTrackedDeletion:
 
     def it_converts_delText_to_t_on_reject(self):
         body = parse_xml(
-            f'<w:body {_NSMAP}>'
-            f'<w:del w:id="1" w:author="B">'
-            f"<w:r><w:delText>text</w:delText></w:r>"
-            f"</w:del>"
-            f"</w:body>"
+            f'<w:body {_NSMAP}><w:del w:id="1" w:author="B"><w:r><w:delText>text</w:delText></w:r></w:del></w:body>'
         )
         del_elm = body[0]
         tracked = TrackedDeletion(del_elm, _make_parent())

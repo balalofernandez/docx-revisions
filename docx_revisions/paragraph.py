@@ -208,11 +208,7 @@ class RevisionParagraph(Paragraph):
 
         ins = OxmlElement(
             "w:ins",
-            attrs=revision_attrs(
-                revision_id,
-                author,
-                dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            ),
+            attrs=revision_attrs(revision_id, author, dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")),
         )
 
         r = OxmlElement("w:r")
@@ -230,11 +226,7 @@ class RevisionParagraph(Paragraph):
         return tracked_insertion
 
     def add_tracked_deletion(
-        self,
-        start: int,
-        end: int,
-        author: str = "",
-        revision_id: int | None = None,
+        self, start: int, end: int, author: str = "", revision_id: int | None = None
     ) -> TrackedDeletion:
         """Wrap existing text at *[start, end)* in a ``w:del`` element.
 
@@ -256,9 +248,7 @@ class RevisionParagraph(Paragraph):
         """
         para_text = self.text
         if start < 0 or end > len(para_text) or start >= end:
-            raise ValueError(
-                f"Invalid offsets: start={start}, end={end} for text of length {len(para_text)}"
-            )
+            raise ValueError(f"Invalid offsets: start={start}, end={end} for text of length {len(para_text)}")
 
         if revision_id is None:
             revision_id = self._next_revision_id()
@@ -314,13 +304,7 @@ class RevisionParagraph(Paragraph):
 
         return TrackedDeletion(del_elem, self)  # pyright: ignore[reportArgumentType]
 
-    def replace_tracked(
-        self,
-        search_text: str,
-        replace_text: str,
-        author: str = "",
-        comment: str | None = None,
-    ) -> int:
+    def replace_tracked(self, search_text: str, replace_text: str, author: str = "", comment: str | None = None) -> int:
         """Replace all occurrences of *search_text* with *replace_text* using track changes.
 
         Each replacement creates a tracked deletion of *search_text* and a
@@ -368,16 +352,10 @@ class RevisionParagraph(Paragraph):
                     insert_idx += 1
 
                 if i < len(parts) - 1:
-                    parent.insert(
-                        insert_idx,
-                        make_del_element(search_text, author, self._next_revision_id(), now),
-                    )
+                    parent.insert(insert_idx, make_del_element(search_text, author, self._next_revision_id(), now))
                     insert_idx += 1
 
-                    parent.insert(
-                        insert_idx,
-                        make_ins_element(replace_text, author, self._next_revision_id(), now),
-                    )
+                    parent.insert(insert_idx, make_ins_element(replace_text, author, self._next_revision_id(), now))
                     insert_idx += 1
 
                     count += 1
@@ -385,12 +363,7 @@ class RevisionParagraph(Paragraph):
         return count
 
     def replace_tracked_at(
-        self,
-        start: int,
-        end: int,
-        replace_text: str,
-        author: str = "",
-        comment: str | None = None,
+        self, start: int, end: int, replace_text: str, author: str = "", comment: str | None = None
     ) -> None:
         """Replace text at character offsets *[start, end)* using track changes.
 
@@ -411,9 +384,7 @@ class RevisionParagraph(Paragraph):
         """
         para_text = self.text
         if start < 0 or end > len(para_text) or start >= end:
-            raise ValueError(
-                f"Invalid offsets: start={start}, end={end} for text of length {len(para_text)}"
-            )
+            raise ValueError(f"Invalid offsets: start={start}, end={end} for text of length {len(para_text)}")
 
         run_boundaries = self._get_run_boundaries()
         if not run_boundaries:
@@ -444,9 +415,7 @@ class RevisionParagraph(Paragraph):
             deleted_from_end = end_text[:end_offset_in_run]
             after_text = end_text[end_offset_in_run:] or None
 
-            middle_deleted = "".join(
-                runs[i].text for i in range(start_run_idx + 1, end_run_idx)
-            )
+            middle_deleted = "".join(runs[i].text for i in range(start_run_idx + 1, end_run_idx))
             deleted_text = deleted_from_start + middle_deleted + deleted_from_end
             first_r = start_run._r
 
@@ -463,15 +432,7 @@ class RevisionParagraph(Paragraph):
                 parent.remove(run_elem)
 
         splice_tracked_replace(
-            parent,
-            index,
-            before_text,
-            deleted_text,
-            replace_text,
-            after_text,
-            author,
-            self._next_revision_id,
-            now,
+            parent, index, before_text, deleted_text, replace_text, after_text, author, self._next_revision_id, now
         )
 
     # ------------------------------------------------------------------
@@ -492,9 +453,7 @@ class RevisionParagraph(Paragraph):
             offset += run_len
         return boundaries
 
-    def _find_run_at_offset(
-        self, boundaries: List[tuple[int, int, int]], offset: int
-    ) -> tuple[int, int]:
+    def _find_run_at_offset(self, boundaries: List[tuple[int, int, int]], offset: int) -> tuple[int, int]:
         """Find which run contains *offset* and the offset within that run."""
         for run_idx, run_start, run_end in boundaries:
             if run_start <= offset < run_end or (offset == run_end and run_idx == len(boundaries) - 1):

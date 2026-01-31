@@ -17,6 +17,7 @@ theme:
   name: material
   features:
     - content.code.copy
+    - navigation.indexes
   palette:
     scheme: default
     primary: white
@@ -38,3 +39,6 @@ plugins:
 
 nav:
   - Home: index.md
+  - Examples:
+    - examples/index.md
+    - AI Chat: examples/ai-chat.md

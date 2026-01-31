@@ -18,6 +18,9 @@ dev = [
     "mkdocs-material>=9.0",
     "mkdocstrings[python]>=0.24",
 ]
+examples = [
+    "pydantic-ai>=1.51.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/balalofernandez/docx-revisions"

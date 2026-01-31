@@ -1,7 +1,5 @@
 """Tests for RevisionParagraph — reading and writing track changes."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 import pytest

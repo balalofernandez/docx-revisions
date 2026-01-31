@@ -72,11 +72,7 @@ class RevisionRun(Run):
 
         del_elem = OxmlElement(
             "w:del",
-            attrs=revision_attrs(
-                revision_id,
-                author,
-                dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-            ),
+            attrs=revision_attrs(revision_id, author, dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")),
         )
 
         for t_elem in self._r.findall(qn("w:t")):
@@ -92,13 +88,7 @@ class RevisionRun(Run):
 
         return TrackedDeletion(del_elem, self._parent)  # pyright: ignore[reportArgumentType]
 
-    def replace_tracked_at(
-        self,
-        start: int,
-        end: int,
-        replace_text: str,
-        author: str = "",
-    ) -> None:
+    def replace_tracked_at(self, start: int, end: int, replace_text: str, author: str = "") -> None:
         """Replace text at character offsets *[start, end)* using track changes.
 
         Creates a tracked deletion of the text at positions ``[start, end)``
@@ -115,9 +105,7 @@ class RevisionRun(Run):
         """
         text = self.text
         if start < 0 or end > len(text) or start >= end:
-            raise ValueError(
-                f"Invalid offsets: start={start}, end={end} for text of length {len(text)}"
-            )
+            raise ValueError(f"Invalid offsets: start={start}, end={end} for text of length {len(text)}")
 
         now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         before_text = text[:start] or None
@@ -133,15 +121,7 @@ class RevisionRun(Run):
         parent.remove(r_elem)
 
         splice_tracked_replace(
-            parent,
-            index,
-            before_text,
-            deleted_text,
-            replace_text,
-            after_text,
-            author,
-            self._next_revision_id,
-            now,
+            parent, index, before_text, deleted_text, replace_text, after_text, author, self._next_revision_id, now
         )
 
     def _next_revision_id(self) -> int:

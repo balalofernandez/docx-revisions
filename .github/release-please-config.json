@@ -7,12 +7,17 @@
       "changelog-path": "CHANGELOG.md",
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": true,
+      "changelog-sections": [
+        { "type": "fix", "section": "Bug Fixes", "bump": "patch" },
+        { "type": "docs", "section": "Documentation", "bump": "patch" },
+        { "type": "chore", "section": "Miscellaneous", "hidden": true }
+      ],
       "extra-files": [
         "pyproject.toml",
         {
           "type": "toml",
           "path": "uv.lock",
-          "jsonpath": "$.package[?(@.name.value=='temis')].version"
+          "jsonpath": "$.package[?(@.name.value=='docx-revisions')].version"
         }
       ]
     }

@@ -1,7 +1,5 @@
 """Tests for replace_tracked and replace_tracked_at."""
 
-from __future__ import annotations
-
 import pytest
 from docx import Document
 
