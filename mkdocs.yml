@@ -22,9 +22,7 @@ theme:
     scheme: default
     primary: white
     accent: teal
-  font:
-    text: JetBrains Mono
-    code: JetBrains Mono
+  font: false
 
 plugins:
   - search
