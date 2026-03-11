@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/balalofernandez/docx-revisions/compare/docx-revisions-v0.1.3...docx-revisions-v0.1.4) (2026-03-11)
+
+
+### Features
+
+* Enhance text replacement functionality in RevisionParagraph ([#6](https://github.com/balalofernandez/docx-revisions/issues/6)) ([5335366](https://github.com/balalofernandez/docx-revisions/commit/533536625baa352663f5f687bc87174bdf975d8d))
+
 ## [0.1.3](https://github.com/balalofernandez/docx-revisions/compare/docx-revisions-v0.1.2...docx-revisions-v0.1.3) (2026-01-31)
 
 
