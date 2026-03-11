@@ -57,6 +57,66 @@ class DescribeRevisionParagraph_replace_tracked:
         assert "After" in rp.accepted_text
         assert "test" in rp.accepted_text
 
+    def it_finds_text_spanning_multiple_runs(self):
+        """Search text split across runs (e.g. OOXML run splitting)."""
+        doc = Document()
+        para = doc.add_paragraph("")
+        # Simulate OOXML run splitting: "ACME Corp" | " Ltd."
+        para.add_run("ACME Corp")
+        para.add_run(" Ltd.")
+        rp = RevisionParagraph.from_paragraph(para)
+
+        count = rp.replace_tracked("ACME Corp Ltd.", "ACME Inc Ltd.", author="Tester")
+
+        assert count == 1
+        assert any(d.text == "ACME Corp Ltd." for d in rp.deletions)
+        assert any(i.text == "ACME Inc Ltd." for i in rp.insertions)
+
+    def it_finds_text_spanning_many_runs(self):
+        """Date split across 7 runs like real OOXML: 20/04/2027."""
+        doc = Document()
+        para = doc.add_paragraph("")
+        for chunk in ["20", "/", "0", "4", "/202", "7"]:
+            para.add_run(chunk)
+        rp = RevisionParagraph.from_paragraph(para)
+
+        count = rp.replace_tracked("20/04/2027", "31/12/2027", author="Tester")
+
+        assert count == 1
+        assert any(d.text == "20/04/2027" for d in rp.deletions)
+        assert any(i.text == "31/12/2027" for i in rp.insertions)
+
+    def it_handles_cross_run_with_surrounding_text(self):
+        """Cross-run match with text before and after in the boundary runs."""
+        doc = Document()
+        para = doc.add_paragraph("")
+        para.add_run("amount of 26.000")
+        para.add_run(" Euros (TWENTY")
+        rp = RevisionParagraph.from_paragraph(para)
+
+        count = rp.replace_tracked("26.000 Euros", "30.000 Euros", author="Tester")
+
+        assert count == 1
+        assert any(d.text == "26.000 Euros" for d in rp.deletions)
+        assert any(i.text == "30.000 Euros" for i in rp.insertions)
+        assert "amount of" in rp.accepted_text
+        assert "(TWENTY" in rp.accepted_text
+
+    def it_handles_multiple_cross_run_matches(self):
+        """Multiple occurrences where each spans runs."""
+        doc = Document()
+        para = doc.add_paragraph("")
+        para.add_run("Hello Wor")
+        para.add_run("ld and Wor")
+        para.add_run("ld again")
+        rp = RevisionParagraph.from_paragraph(para)
+
+        count = rp.replace_tracked("World", "Earth", author="Tester")
+
+        assert count == 2
+        assert len(rp.deletions) == 2
+        assert len(rp.insertions) == 2
+
 
 class DescribeRevisionParagraph_replace_tracked_at:
     """Tests for RevisionParagraph.replace_tracked_at."""

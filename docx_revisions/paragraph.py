@@ -18,7 +18,6 @@ from docx.text.run import Run
 
 from docx_revisions._helpers import (
     make_del_element,
-    make_ins_element,
     make_text_run,
     next_revision_id,
     revision_attrs,
@@ -308,7 +307,8 @@ class RevisionParagraph(Paragraph):
         """Replace all occurrences of *search_text* with *replace_text* using track changes.
 
         Each replacement creates a tracked deletion of *search_text* and a
-        tracked insertion of *replace_text*.
+        tracked insertion of *replace_text*.  Matches text across run
+        boundaries (handles OOXML run splitting).
 
         Args:
             search_text: Text to find and replace.
@@ -327,38 +327,25 @@ class RevisionParagraph(Paragraph):
             ```
         """
         count = 0
-        now = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        # Concatenate all run text and search across run boundaries.
+        full_text = self.text
+        search_len = len(search_text)
 
-        runs = list(self.runs)
-        for run in runs:
-            text = run.text
-            if search_text not in text:
-                continue
+        # Find all match positions in the concatenated text.
+        # Process right-to-left so earlier offsets stay valid after each splice.
+        positions: list[int] = []
+        start = 0
+        while True:
+            idx = full_text.find(search_text, start)
+            if idx == -1:
+                break
+            positions.append(idx)
+            start = idx + search_len
 
-            parts = text.split(search_text)
-
-            r_elem = run._r
-            parent = r_elem.getparent()
-            if parent is None:
-                continue
-            index = list(parent).index(r_elem)
-
-            parent.remove(r_elem)
-
-            insert_idx = index
-            for i, part in enumerate(parts):
-                if part:
-                    parent.insert(insert_idx, make_text_run(part))
-                    insert_idx += 1
-
-                if i < len(parts) - 1:
-                    parent.insert(insert_idx, make_del_element(search_text, author, self._next_revision_id(), now))
-                    insert_idx += 1
-
-                    parent.insert(insert_idx, make_ins_element(replace_text, author, self._next_revision_id(), now))
-                    insert_idx += 1
-
-                    count += 1
+        # Apply replacements right-to-left to preserve offsets.
+        for pos in reversed(positions):
+            self.replace_tracked_at(pos, pos + search_len, replace_text, author=author, comment=comment)
+            count += 1
 
         return count
 
