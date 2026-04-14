@@ -125,10 +125,52 @@ class RevisionDocument:
 
         return total_count
 
-    def save(self, path: str | Path) -> None:
-        """Save the document to *path*.
+    def save(self, path_or_stream: str | Path | IO[bytes]) -> None:
+        """Save the document to a path or file-like object.
 
         Args:
-            path: Destination file path.
+            path_or_stream: Destination file path (``str`` or ``Path``) or a
+                writable binary file-like object (anything with a ``write``
+                method, such as ``io.BytesIO``).
+
+        Raises:
+            TypeError: If *path_or_stream* is neither a path nor a writable
+                binary stream.
+            ValueError: If *path_or_stream* is an empty string, or is a text-
+                mode file object.
+
+        Example:
+            ```python
+            import io
+            from docx_revisions import RevisionDocument
+
+            rdoc = RevisionDocument("contract.docx")
+            rdoc.accept_all()
+
+            buffer = io.BytesIO()
+            rdoc.save(buffer)
+            buffer.seek(0)
+            data = buffer.read()
+            ```
         """
-        self._document.save(str(path))
+        if isinstance(path_or_stream, str | Path):
+            path_str = str(path_or_stream)
+            if not path_str:
+                raise ValueError("save() path must not be empty")
+            self._document.save(path_str)
+            return
+
+        write = getattr(path_or_stream, "write", None)
+        if not callable(write):
+            raise TypeError(
+                f"save() expects a str, Path, or writable binary file-like object; got {type(path_or_stream).__name__}"
+            )
+
+        mode = getattr(path_or_stream, "mode", None)
+        if isinstance(mode, str) and "b" not in mode:
+            raise ValueError(
+                f"save() requires a binary-mode stream; got mode={mode!r}. "
+                "Open the file with mode='wb' or use io.BytesIO()."
+            )
+
+        self._document.save(path_or_stream)
