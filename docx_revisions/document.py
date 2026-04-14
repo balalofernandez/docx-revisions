@@ -133,6 +133,12 @@ class RevisionDocument:
                 writable binary file-like object (anything with a ``write``
                 method, such as ``io.BytesIO``).
 
+        Raises:
+            TypeError: If *path_or_stream* is neither a path nor a writable
+                binary stream.
+            ValueError: If *path_or_stream* is an empty string, or is a text-
+                mode file object.
+
         Example:
             ```python
             import io
@@ -147,7 +153,24 @@ class RevisionDocument:
             data = buffer.read()
             ```
         """
-        if hasattr(path_or_stream, "write"):
-            self._document.save(path_or_stream)
-        else:
-            self._document.save(str(path_or_stream))
+        if isinstance(path_or_stream, str | Path):
+            path_str = str(path_or_stream)
+            if not path_str:
+                raise ValueError("save() path must not be empty")
+            self._document.save(path_str)
+            return
+
+        write = getattr(path_or_stream, "write", None)
+        if not callable(write):
+            raise TypeError(
+                f"save() expects a str, Path, or writable binary file-like object; got {type(path_or_stream).__name__}"
+            )
+
+        mode = getattr(path_or_stream, "mode", None)
+        if isinstance(mode, str) and "b" not in mode:
+            raise ValueError(
+                f"save() requires a binary-mode stream; got mode={mode!r}. "
+                "Open the file with mode='wb' or use io.BytesIO()."
+            )
+
+        self._document.save(path_or_stream)

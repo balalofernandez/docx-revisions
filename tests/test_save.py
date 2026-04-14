@@ -3,6 +3,7 @@
 import io
 from pathlib import Path
 
+import pytest
 from docx import Document
 
 from docx_revisions import RevisionDocument
@@ -43,3 +44,29 @@ class DescribeRevisionDocument_save_targets:
 
         rdoc2 = RevisionDocument(str(path))
         assert rdoc2.document is not None
+
+    def it_rejects_empty_string_path(self):
+        rdoc = RevisionDocument()
+        with pytest.raises(ValueError, match="must not be empty"):
+            rdoc.save("")
+
+    def it_rejects_non_path_non_stream(self):
+        rdoc = RevisionDocument()
+        with pytest.raises(TypeError):
+            rdoc.save(123)  # type: ignore[arg-type]
+
+        with pytest.raises(TypeError):
+            rdoc.save(object())  # type: ignore[arg-type]
+
+    def it_rejects_text_mode_stream(self, tmp_path: Path):
+        rdoc = RevisionDocument()
+        path = tmp_path / "text.docx"
+        with open(path, "w") as text_stream, pytest.raises(ValueError, match="binary-mode stream"):
+            rdoc.save(text_stream)  # type: ignore[arg-type]
+
+    def it_saves_to_binary_file_handle(self, tmp_path: Path):
+        rdoc = RevisionDocument()
+        path = tmp_path / "binary.docx"
+        with open(path, "wb") as binary_stream:
+            rdoc.save(binary_stream)
+        assert path.stat().st_size > 0
