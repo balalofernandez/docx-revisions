@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.5](https://github.com/balalofernandez/docx-revisions/compare/docx-revisions-v0.1.4...docx-revisions-v0.1.5) (2026-04-14)
+
+
+### Features
+
+* support operating on accepted/original text indices (closes [#8](https://github.com/balalofernandez/docx-revisions/issues/8)) ([#13](https://github.com/balalofernandez/docx-revisions/issues/13)) ([17606e6](https://github.com/balalofernandez/docx-revisions/commit/17606e655ccaca949d81e7b3fb529983fa71bda7))
+
+
+### Bug Fixes
+
+* accept/reject tracked changes in tables (closes [#9](https://github.com/balalofernandez/docx-revisions/issues/9)) ([#12](https://github.com/balalofernandez/docx-revisions/issues/12)) ([d82d3cc](https://github.com/balalofernandez/docx-revisions/commit/d82d3cccd27a2b62d40c7f78ee4fdb2a01b3af2e))
+* support saving to file-like objects (closes [#10](https://github.com/balalofernandez/docx-revisions/issues/10)) ([#11](https://github.com/balalofernandez/docx-revisions/issues/11)) ([c0a2f9a](https://github.com/balalofernandez/docx-revisions/commit/c0a2f9a1cf1cf33b81ac5e976cc36ac8a317eef3))
+
 ## [0.1.4](https://github.com/balalofernandez/docx-revisions/compare/docx-revisions-v0.1.3...docx-revisions-v0.1.4) (2026-03-11)
 
 
