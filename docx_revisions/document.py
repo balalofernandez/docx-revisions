@@ -125,10 +125,29 @@ class RevisionDocument:
 
         return total_count
 
-    def save(self, path: str | Path) -> None:
-        """Save the document to *path*.
+    def save(self, path_or_stream: str | Path | IO[bytes]) -> None:
+        """Save the document to a path or file-like object.
 
         Args:
-            path: Destination file path.
+            path_or_stream: Destination file path (``str`` or ``Path``) or a
+                writable binary file-like object (anything with a ``write``
+                method, such as ``io.BytesIO``).
+
+        Example:
+            ```python
+            import io
+            from docx_revisions import RevisionDocument
+
+            rdoc = RevisionDocument("contract.docx")
+            rdoc.accept_all()
+
+            buffer = io.BytesIO()
+            rdoc.save(buffer)
+            buffer.seek(0)
+            data = buffer.read()
+            ```
         """
-        self._document.save(str(path))
+        if hasattr(path_or_stream, "write"):
+            self._document.save(path_or_stream)
+        else:
+            self._document.save(str(path_or_stream))
