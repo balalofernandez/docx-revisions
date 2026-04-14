@@ -130,7 +130,7 @@ def _build_doc_with_table_changes():
 
 
 class DescribeTables:
-    """Accept/reject tracked changes inside tables (issue #9)."""
+    """Accept/reject tracked changes inside tables."""
 
     def it_sees_tracked_changes_inside_tables(self):
         doc = _build_doc_with_table_changes()
