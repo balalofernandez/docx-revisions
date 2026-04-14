@@ -8,10 +8,11 @@ for accepting, rejecting, and performing find-and-replace with tracking.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import IO, List
+from typing import IO, Iterator, List
 
 from docx import Document as _new_document
 from docx.document import Document as _DocumentClass
+from docx.table import Table as _Table
 
 from docx_revisions.paragraph import RevisionParagraph
 from docx_revisions.revision import TrackedChange
@@ -54,14 +55,55 @@ class RevisionDocument:
 
     @property
     def paragraphs(self) -> List[RevisionParagraph]:
-        """All body paragraphs as ``RevisionParagraph`` objects."""
+        """All body paragraphs as ``RevisionParagraph`` objects.
+
+        Only paragraphs in the document body are returned. Paragraphs inside
+        tables are excluded. Use :attr:`all_paragraphs` to iterate over every
+        paragraph including those nested in tables.
+        """
         return [RevisionParagraph.from_paragraph(p) for p in self._document.paragraphs]
 
     @property
+    def all_paragraphs(self) -> List[RevisionParagraph]:
+        """Every paragraph in the document, including those inside tables.
+
+        Walks the document body and recurses into all tables (including
+        nested tables within cells).
+
+        Example:
+            ```python
+            rdoc = RevisionDocument("contract.docx")
+            for para in rdoc.all_paragraphs:
+                if para.has_track_changes:
+                    print(para.accepted_text)
+            ```
+        """
+        return list(self._iter_all_paragraphs())
+
+    def _iter_all_paragraphs(self) -> Iterator[RevisionParagraph]:
+        """Yield every ``RevisionParagraph`` in the body and all tables.
+
+        Recurses into nested tables via ``cell.tables``.
+        """
+        for p in self._document.paragraphs:
+            yield RevisionParagraph.from_paragraph(p)
+        for table in self._document.tables:
+            yield from self._iter_table_paragraphs(table)
+
+    def _iter_table_paragraphs(self, table: _Table) -> Iterator[RevisionParagraph]:
+        """Yield every ``RevisionParagraph`` inside *table* recursively."""
+        for row in table.rows:
+            for cell in row.cells:
+                for p in cell.paragraphs:
+                    yield RevisionParagraph.from_paragraph(p)
+                for nested in cell.tables:
+                    yield from self._iter_table_paragraphs(nested)
+
+    @property
     def track_changes(self) -> List[TrackedChange]:
-        """All tracked changes across the entire document body."""
+        """All tracked changes across the document body and tables."""
         changes: List[TrackedChange] = []
-        for para in self.paragraphs:
+        for para in self._iter_all_paragraphs():
             changes.extend(para.track_changes)
         return changes
 
@@ -69,8 +111,9 @@ class RevisionDocument:
         """Accept every tracked change in the document.
 
         Insertions are kept (wrapper removed), deletions are removed entirely.
+        Tracked changes inside tables (including nested tables) are processed.
         """
-        for para in self.paragraphs:
+        for para in self._iter_all_paragraphs():
             for change in list(para.track_changes):
                 change.accept()
 
@@ -78,9 +121,10 @@ class RevisionDocument:
         """Reject every tracked change in the document.
 
         Insertions are removed entirely, deletions are kept (wrapper removed,
-        ``w:delText`` converted back to ``w:t``).
+        ``w:delText`` converted back to ``w:t``). Tracked changes inside
+        tables (including nested tables) are processed.
         """
-        for para in self.paragraphs:
+        for para in self._iter_all_paragraphs():
             for change in list(para.track_changes):
                 change.reject()
 
@@ -89,7 +133,8 @@ class RevisionDocument:
     ) -> int:
         """Find and replace across the whole document with track changes.
 
-        Searches all paragraphs in the document body and tables.
+        Searches all paragraphs in the document body and tables (including
+        nested tables).
 
         Args:
             search_text: Text to find.
@@ -112,17 +157,8 @@ class RevisionDocument:
             ```
         """
         total_count = 0
-
-        for para in self.paragraphs:
+        for para in self._iter_all_paragraphs():
             total_count += para.replace_tracked(search_text, replace_text, author=author, comment=comment)
-
-        for table in self._document.tables:
-            for row in table.rows:
-                for cell in row.cells:
-                    for p in cell.paragraphs:
-                        rp = RevisionParagraph.from_paragraph(p)
-                        total_count += rp.replace_tracked(search_text, replace_text, author=author, comment=comment)
-
         return total_count
 
     def save(self, path: str | Path) -> None:
