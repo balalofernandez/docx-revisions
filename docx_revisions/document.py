@@ -13,7 +13,7 @@ from typing import IO, List
 from docx import Document as _new_document
 from docx.document import Document as _DocumentClass
 
-from docx_revisions.paragraph import RevisionParagraph
+from docx_revisions.paragraph import IndexMode, RevisionParagraph
 from docx_revisions.revision import TrackedChange
 
 
@@ -69,23 +69,34 @@ class RevisionDocument:
         """Accept every tracked change in the document.
 
         Insertions are kept (wrapper removed), deletions are removed entirely.
+        Loops until no tracked changes remain so that nested revisions (which
+        can arise from ``replace_tracked(index_mode="accepted")``) are fully
+        resolved.
         """
         for para in self.paragraphs:
-            for change in list(para.track_changes):
-                change.accept()
+            while para.track_changes:
+                for change in list(para.track_changes):
+                    change.accept()
 
     def reject_all(self) -> None:
         """Reject every tracked change in the document.
 
         Insertions are removed entirely, deletions are kept (wrapper removed,
-        ``w:delText`` converted back to ``w:t``).
+        ``w:delText`` converted back to ``w:t``).  Loops until no tracked
+        changes remain.
         """
         for para in self.paragraphs:
-            for change in list(para.track_changes):
-                change.reject()
+            while para.track_changes:
+                for change in list(para.track_changes):
+                    change.reject()
 
     def find_and_replace_tracked(
-        self, search_text: str, replace_text: str, author: str = "", comment: str | None = None
+        self,
+        search_text: str,
+        replace_text: str,
+        author: str = "",
+        comment: str | None = None,
+        index_mode: IndexMode = "text",
     ) -> int:
         """Find and replace across the whole document with track changes.
 
@@ -97,6 +108,9 @@ class RevisionDocument:
             author: Author name for the revisions.
             comment: Optional comment text (requires python-docx comment
                 support).
+            index_mode: Which text view to search against per paragraph.  See
+                :meth:`RevisionParagraph.replace_tracked` — ``"text"`` (default),
+                ``"accepted"``, or ``"original"``.
 
         Returns:
             Total number of replacements made.
@@ -104,24 +118,29 @@ class RevisionDocument:
         Example:
             ```python
             rdoc = RevisionDocument("doc.docx")
+            # Replace against the accepted view so matches inside prior
+            # tracked insertions are also found.
             count = rdoc.find_and_replace_tracked(
-                "Acme Corp", "NewCo Inc", author="Legal"
+                "Acme Corp", "NewCo Inc", author="Legal", index_mode="accepted"
             )
-            print(f"Replaced {count} occurrences")
             rdoc.save("doc_revised.docx")
             ```
         """
         total_count = 0
 
         for para in self.paragraphs:
-            total_count += para.replace_tracked(search_text, replace_text, author=author, comment=comment)
+            total_count += para.replace_tracked(
+                search_text, replace_text, author=author, comment=comment, index_mode=index_mode
+            )
 
         for table in self._document.tables:
             for row in table.rows:
                 for cell in row.cells:
                     for p in cell.paragraphs:
                         rp = RevisionParagraph.from_paragraph(p)
-                        total_count += rp.replace_tracked(search_text, replace_text, author=author, comment=comment)
+                        total_count += rp.replace_tracked(
+                            search_text, replace_text, author=author, comment=comment, index_mode=index_mode
+                        )
 
         return total_count
 
